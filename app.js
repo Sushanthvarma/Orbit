@@ -2573,7 +2573,7 @@
       h('div', { class: 'title-block' }, [h('h1', {}, 'Profile & settings'), h('div', { class: 'sub' }, 'Account, preferences, data')]),
       h('div', { class: 'actions' }, [
         h('button', { class: 'btn btn-ghost btn-sm', onClick: exportAllJson }, 'Export JSON'),
-        h('button', { class: 'btn btn-danger btn-sm', onClick: confirmDeleteAll }, 'Delete account')
+        h('button', { class: 'btn btn-danger btn-sm', onClick: confirmDeleteAll }, 'Wipe all data')
       ])
     ]));
 
