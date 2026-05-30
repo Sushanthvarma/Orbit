@@ -4636,12 +4636,18 @@
         console.log('[Realtime] starting shared-group listeners');
         // Live list of my shared groups.
         _groupsUnsub = OrbitGroups.onMyGroups((groups) => {
-          // Notify when a NEW member appears in a group (works for every
-          // existing member — their onMyGroups fires when memberUids grows).
+          // Notify when a NEW member appears in a group — even across sessions.
+          // We persist the last-seen member set per group in localStorage, so
+          // when you reopen the app after someone joined while you were away,
+          // you still get told. Works for every existing member.
           const myUid = (window.OrbitGroups && OrbitGroups.currentUid && OrbitGroups.currentUid()) || null;
           groups.forEach((g) => {
             const now = g.memberUids || [];
-            const prev = _prevMembers[g.id];
+            const key = 'orbit_members_' + g.id;
+            let prev = _prevMembers[g.id];
+            if (!prev) {
+              try { const s = JSON.parse(localStorage.getItem(key) || 'null'); if (Array.isArray(s)) prev = new Set(s); } catch (_) {}
+            }
             if (prev) {
               now.forEach((mu) => {
                 if (!prev.has(mu) && mu !== myUid) {
@@ -4651,6 +4657,7 @@
               });
             }
             _prevMembers[g.id] = new Set(now);
+            try { localStorage.setItem(key, JSON.stringify(now)); } catch (_) {}
           });
           const tagged = groups.map((g) => normalizeSharedGroup(g));
           State.groups = mergeById(State.groups, tagged);
