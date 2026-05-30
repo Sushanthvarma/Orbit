@@ -502,35 +502,73 @@
     const owed = totalOwedToYou();
     const eu = net.EUR || 0;
 
-    const kpiGrid = h('div', { class: 'kpi-grid' });
-    kpiGrid.appendChild(kpiCard('Net balance', netINR, 'INR', netINR === 0 ? '' : netINR > 0 ? 'You are owed' : 'You owe overall'));
-    kpiGrid.appendChild(kpiCard('You are owed', owed, 'INR', 'Across ' + countCreditors() + ' people', 'pos'));
-    kpiGrid.appendChild(kpiCard('You owe', -owe, 'INR', 'Across ' + countDebtors() + ' people', 'neg'));
-    if (Math.abs(eu) > 0.01) {
-      kpiGrid.appendChild(kpiCard('Net balance', eu, 'EUR', 'Europe Trip 2026'));
-    } else {
-      kpiGrid.appendChild(kpiCard('Active groups', State.groups.length, '', State.expenses.length + ' total expenses'));
-    }
+    // Balance row — reference layout: 2fr / 1fr / 1fr, first card is the
+    // dark-gradient hero, all three get live 3D mouse-tilt.
+    const kpiGrid = h('div', { class: 'kpi-grid bal-row' });
+    const netSub = netINR === 0 ? 'You are even' : netINR > 0
+      ? (countCreditors() + ' friends owe you across ' + State.groups.length + ' groups')
+      : 'You owe across ' + countDebtors() + ' people';
+    kpiGrid.appendChild(kpiCard('Net position', netINR, 'INR', netSub, '', { hero: true }));
+    kpiGrid.appendChild(kpiCard('You are owed', owed, 'INR', 'Across ' + countCreditors() + ' people', 'pos', { tilt: true }));
+    kpiGrid.appendChild(kpiCard('You owe', -owe, 'INR', 'Across ' + countDebtors() + ' people', 'neg', { tilt: true }));
     page.appendChild(kpiGrid);
 
-    // Middle grid (activity table + settle panel)
-    const middle = h('div', { class: 'grid-2', style: { marginBottom: 'var(--s-5)' } });
+    // Secondary stat row (EUR / groups) — only when there's a foreign balance.
+    if (Math.abs(eu) > 0.01) {
+      const sub2 = h('div', { class: 'kpi-grid kpi-grid-3' });
+      sub2.appendChild(kpiCard('Europe Trip balance', eu, 'EUR', 'Europe Trip 2026', eu > 0 ? 'pos' : 'neg', { tilt: true }));
+      sub2.appendChild(kpiCard('Active groups', State.groups.length, '', 'Across all workspaces', '', { tilt: true }));
+      sub2.appendChild(kpiCard('Total expenses', State.expenses.length, '', 'Logged so far', '', { tilt: true }));
+      page.appendChild(sub2);
+    }
+
+    // Content grid — reference layout: 1fr / 380px (activity + settle/chart).
+    const middle = h('div', { class: 'grid-2 content-grid', style: { marginBottom: 'var(--s-5)' } });
     middle.appendChild(panelRecentActivity());
-    middle.appendChild(panelSettleNow());
+    const rightCol = h('div', { class: 'right-col' });
+    rightCol.appendChild(panelSettleNow());
+    rightCol.appendChild(panelSpendChart28());
+    middle.appendChild(rightCol);
     page.appendChild(middle);
 
-    // Bottom chart
-    page.appendChild(panelSpendChart28());
-
     setMain(page);
+    // Wire the 3D mouse-tilt after the nodes are in the DOM.
+    bindTilt(page);
   }
-  function kpiCard(label, value, currency, sub, valClass = '') {
+  function kpiCard(label, value, currency, sub, valClass = '', opts = {}) {
     const v = typeof value === 'number' && currency ? fmtMoney(value, currency, false) : String(value);
-    return h('div', { class: 'kpi' }, [
+    const cls = 'kpi' + (opts.hero ? ' kpi-hero tilt' : opts.tilt ? ' tilt' : '');
+    const node = h('div', { class: cls }, [
       h('div', { class: 'kpi-label' }, label),
-      h('div', { class: 'kpi-value ' + valClass }, v),
+      h('div', { class: 'kpi-value ' + (opts.hero ? '' : valClass) }, v),
       sub ? h('div', { class: 'kpi-delta' }, sub) : null
     ]);
+    if (opts.hero) node.appendChild(h('div', { class: 'kpi-orbit', html: orbitOrnamentSVG() }));
+    return node;
+  }
+  // Decorative iris orbit ring drawn behind the hero card value.
+  function orbitOrnamentSVG() {
+    return '<svg width="150" height="150" viewBox="0 0 150 150" fill="none" aria-hidden="true">' +
+      '<ellipse cx="75" cy="75" rx="60" ry="24" stroke="rgba(180,168,255,0.5)" stroke-width="1.2" transform="rotate(-18 75 75)"/>' +
+      '<ellipse cx="75" cy="75" rx="40" ry="58" stroke="rgba(138,124,255,0.4)" stroke-width="1.2" transform="rotate(22 75 75)"/>' +
+      '<circle cx="118" cy="58" r="3.5" fill="#B4A8FF"/>' +
+      '<circle cx="34" cy="98" r="2.5" fill="rgba(180,168,255,0.7)"/></svg>';
+  }
+  // Live mouse-tracking 3D tilt (perspective 900px, max ±8deg), reset on leave.
+  function bindTilt(root) {
+    (root.querySelectorAll ? root.querySelectorAll('.tilt') : []).forEach((el) => {
+      el.addEventListener('mousemove', (e) => {
+        const r = el.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - 0.5;
+        const y = (e.clientY - r.top) / r.height - 0.5;
+        el.style.transition = 'transform 80ms ease-out';
+        el.style.transform = `perspective(900px) rotateX(${(-y * 8).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg) translateZ(6px)`;
+      });
+      el.addEventListener('mouseleave', () => {
+        el.style.transition = 'transform 550ms cubic-bezier(.22,1,.36,1)';
+        el.style.transform = '';
+      });
+    });
   }
   function countCreditors() {
     const b = computePairBalances(State.selfId);
@@ -1734,13 +1772,17 @@
     const topCat = Object.entries(catTotals).sort((a, b) => b[1] - a[1])[0];
     const delta = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : 0;
 
-    // KPIs
-    const kpis = h('div', { class: 'kpi-grid' });
-    kpis.appendChild(kpiCard('Total your share', total, cur, new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })));
-    kpis.appendChild(kpiCard('Avg per day', avg, cur, daysIn + ' days'));
-    kpis.appendChild(kpiCard('Top category', topCat ? categoryLabel(topCat[0]) : '—', '', topCat ? fmtMoney(topCat[1], cur) : 'No spend'));
-    kpis.appendChild(kpiCard('vs last month', Math.abs(delta).toFixed(1) + '%', '', delta > 0 ? 'higher' : delta < 0 ? 'lower' : 'flat', delta > 0 ? 'neg' : delta < 0 ? 'pos' : ''));
+    // KPIs — hero "total spend" card spanning 2, then three stat cards.
+    const kpis = h('div', { class: 'kpi-grid bal-row' });
+    kpis.appendChild(kpiCard('Total your share', total, cur, new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' }), '', { hero: true }));
+    kpis.appendChild(kpiCard('Avg per day', avg, cur, daysIn + ' days', '', { tilt: true }));
+    kpis.appendChild(kpiCard('Top category', topCat ? categoryLabel(topCat[0]) : '—', '', topCat ? fmtMoney(topCat[1], cur) : 'No spend', '', { tilt: true }));
     page.appendChild(kpis);
+    const kpis2 = h('div', { class: 'kpi-grid kpi-grid-3' });
+    kpis2.appendChild(kpiCard('vs last month', Math.abs(delta).toFixed(1) + '%', '', delta > 0 ? 'higher than April' : delta < 0 ? 'lower than April' : 'flat', delta > 0 ? 'neg' : delta < 0 ? 'pos' : '', { tilt: true }));
+    kpis2.appendChild(kpiCard('Expenses logged', State.expenses.filter(inCur).length, '', 'In ' + cur, '', { tilt: true }));
+    kpis2.appendChild(kpiCard('Categories', Object.keys(catTotals).length, '', 'Distinct spend types', '', { tilt: true }));
+    page.appendChild(kpis2);
 
     // ---- 28-day heatmap (all available data in cur) ----
     const heatCard = h('div', { class: 'card', style: { marginBottom: 'var(--s-5)' } });
@@ -1929,6 +1971,7 @@
     page.appendChild(lists);
 
     setMain(page);
+    bindTilt(page);
   }
 
   // -------- ACTIVITY --------
@@ -3783,7 +3826,6 @@
     } else {
       // Keep our local profile but ensure email + name match the signed-in
       // Google account. The seed default ("You") gets replaced with the real
-      // display name so the dashboard greeting reads correctly.
       if (!self.email) self.email = fbUser.email || self.email || '';
       if (fbUser.displayName && (!self.name || self.name === 'You')) {
         self.name = fbUser.displayName;

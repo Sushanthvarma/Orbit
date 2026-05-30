@@ -538,8 +538,29 @@ svg { display: block; }
   -webkit-text-fill-color: transparent;
 }
 .kpi.kpi-hero .kpi-delta { color: rgba(255,255,255,0.7); }
+.kpi.kpi-hero .kpi-value { font-size: 48px; }
+/* Hero card has more breathing room and the orbit ornament. */
+.kpi.kpi-hero { padding: 26px 28px; }
+.kpi-orbit {
+  position: absolute; right: 18px; top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.85; pointer-events: none; z-index: 1;
+}
+.kpi-orbit svg { width: 150px; height: 150px; }
+/* Keep label/value/delta above the ::after bleed and the ornament. */
+.kpi-label, .kpi-value, .kpi-delta { position: relative; z-index: 2; }
 
 .tilt { transform-style: preserve-3d; transition: transform 550ms var(--ease); will-change: transform; }
+/* Tilt cards must not also run the translateY hover (inline transform wins,
+   but suppress the shadow-only :hover jump for a cleaner combined effect). */
+.kpi.tilt:hover { transform: none; }
+
+/* Balance row — reference 2fr / 1fr / 1fr. Hero spans the wide column. */
+.kpi-grid.bal-row { grid-template-columns: 2fr 1fr 1fr; }
+.kpi-grid.kpi-grid-3 { grid-template-columns: repeat(3, 1fr); }
+/* Dashboard content grid — left fills, right rail fixed 380px. */
+.grid-2.content-grid { grid-template-columns: 1fr 380px; }
+.right-col { display: flex; flex-direction: column; gap: var(--s-5); min-width: 0; }
 
 /* ---------- Layout primitives ---------- */
 .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: var(--s-5); align-items: start; }
@@ -791,6 +812,12 @@ svg { display: block; }
     radial-gradient(900px 600px at 88% 22%, rgba(245,166,35,0.16), transparent 60%),
     radial-gradient(900px 600px at 50% 95%, rgba(107,91,255,0.16), transparent 60%);
 }
+/* The login gate is a full-screen fixed overlay. Its `display:flex` above
+   overrides the UA `[hidden]{display:none}` rule, so toggling `gate.hidden`
+   in JS did NOT hide it — it stayed on top and covered the whole app
+   (signed-in users saw only the background gradient). This guard restores
+   expected behavior: the hidden attribute wins. */
+.login-gate[hidden] { display: none !important; }
 .login-card {
   background: #fff;
   border: 1px solid var(--line);
@@ -871,8 +898,9 @@ svg { display: block; }
   .sidebar { display: none; }
   .topbar { padding: 0 var(--s-4); }
   .main { padding: var(--s-4); }
-  .grid-2, .input-row, .input-row-3 { grid-template-columns: 1fr; }
+  .grid-2, .grid-2.content-grid, .input-row, .input-row-3 { grid-template-columns: 1fr; }
   .group-grid { grid-template-columns: 1fr 1fr; }
-  .kpi-grid { grid-template-columns: 1fr; }
+  .kpi-grid, .kpi-grid.bal-row, .kpi-grid.kpi-grid-3 { grid-template-columns: 1fr; }
+  .kpi-orbit { opacity: 0.5; }
   .modal-foot { padding: 12px 16px 18px; }
 }
