@@ -1068,3 +1068,14 @@ th.sorted .sort-arrow { color: var(--accent); }
 /* ---- Misc ---- */
 .note { font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
 .confirm-modal { max-width: 420px; }
+
+/* ---- WhatsApp settle-row button ---- */
+.btn-wa {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; flex-shrink: 0;
+  border-radius: var(--r-2); border: 1px solid var(--line);
+  background: #fff; color: #25D366; cursor: pointer;
+  box-shadow: var(--sh-1); transition: all var(--dur-micro) var(--ease);
+}
+.btn-wa:hover { background: #25D366; color: #fff; border-color: transparent; transform: translateY(-1px); box-shadow: var(--sh-2); }
+.btn-wa svg { width: 15px; height: 15px; }

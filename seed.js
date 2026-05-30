@@ -189,16 +189,31 @@
   const ORBIT_SEED = { users, groups, expenses, settlements, today };
   global.ORBIT_SEED = ORBIT_SEED;
 
+  // LIVE: new accounts start empty. We create only the signed-in user's own
+  // profile so the app has a 'self' to attribute expenses to; everything else
+  // (groups, friends, expenses) the user adds themselves. The full demo
+  // dataset (ORBIT_SEED) is kept for the explicit 'Load demo data' action.
   global.seedIfNeeded = async function seedIfNeeded() {
     const seeded = await OrbitDB.getMeta('seeded', false);
     if (seeded) return false;
+    const self = {
+      id: 'u_self', name: 'You', handle: '@you', email: '', upi: '',
+      avatar: 'av-c1', isSelf: true, phone: ''
+    };
+    await OrbitDB.putAll('users', [self]);
+    await OrbitDB.setMeta('seeded', true);
+    await OrbitDB.setMeta('selfUserId', 'u_self');
+    await OrbitDB.setMeta('plan', 'free');
+    return true;
+  };
+
+  // Explicit opt-in demo loader (used by the 'Load demo data' button).
+  global.loadDemoData = async function loadDemoData() {
     await OrbitDB.putAll('users', ORBIT_SEED.users);
     await OrbitDB.putAll('groups', ORBIT_SEED.groups);
     await OrbitDB.putAll('expenses', ORBIT_SEED.expenses);
     await OrbitDB.putAll('settlements', ORBIT_SEED.settlements);
-    await OrbitDB.setMeta('seeded', true);
     await OrbitDB.setMeta('selfUserId', 'u_self');
-    await OrbitDB.setMeta('plan', 'free');
     return true;
   };
 })(window);

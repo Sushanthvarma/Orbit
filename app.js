@@ -693,6 +693,7 @@
           h('div', { class: 'amt neg' }, fmtMoney(-amt, 'INR')),
           h('div', { class: 'actions' }, [
             h('button', { class: 'btn-pay', onClick: () => payViaUPI(u, -amt) }, 'Pay'),
+            h('button', { class: 'btn-wa', title: 'Message on WhatsApp', onClick: () => remindViaWhatsApp(u, -amt, 'you-owe') }, waIcon()),
             h('button', { class: 'btn-mark', onClick: () => markSettledModal(uid, -amt) }, 'Mark')
           ])
         ]);
@@ -702,24 +703,104 @@
     card.appendChild(body);
     return card;
   }
+  // ---- Device detection ----
+  // Coarse pointer + small viewport + mobile UA => treat as a phone, where
+  // upi:// intents actually resolve to an installed UPI app.
+  function isMobileDevice() {
+    const ua = navigator.userAgent || '';
+    const uaMobile = /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|BlackBerry|Opera Mini|IEMobile/i.test(ua);
+    const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    const narrow = window.innerWidth <= 920;
+    return uaMobile || (coarse && narrow);
+  }
+  function isAndroid() { return /Android/i.test(navigator.userAgent || ''); }
+
+  // Build a spec-compliant UPI intent URL.
+  function buildUpiIntent(user, amount) {
+    return 'upi://pay?pa=' + encodeURIComponent(user.upi) +
+      '&pn=' + encodeURIComponent(user.name) +
+      '&am=' + Number(amount).toFixed(2) +
+      '&cu=INR&tn=' + encodeURIComponent('Orbit settle');
+  }
+
   function payViaUPI(user, amount) {
-    if (!user.upi) {
-      toast('No UPI VPA on file for ' + user.name, 'neg');
+    if (!user || !user.upi) {
+      toast('No UPI ID on file for ' + (user ? user.name : 'this person'), 'neg');
       return;
     }
-    const url = 'upi://pay?pa=' + encodeURIComponent(user.upi) +
-      '&pn=' + encodeURIComponent(user.name) +
-      '&am=' + amount.toFixed(2) +
-      '&cu=INR&tn=' + encodeURIComponent('Orbit settle');
-    // Use a hidden anchor click so desktop browsers without a UPI handler
-    // simply do nothing (instead of a "site can't be reached" error page).
-    const a = document.createElement('a');
-    a.href = url;
-    a.rel = 'noopener';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    toast('Opening UPI app for ' + fmtMoney(amount, 'INR') + '…');
-    try { a.click(); } finally { document.body.removeChild(a); }
+    const url = buildUpiIntent(user, amount);
+    if (isMobileDevice()) {
+      // Phone: fire the intent — Android shows the UPI app chooser
+      // (GPay / PhonePe / Paytm); the user picks their app.
+      const a = document.createElement('a');
+      a.href = url; a.rel = 'noopener'; a.style.display = 'none';
+      document.body.appendChild(a);
+      toast('Opening your UPI app for ' + fmtMoney(amount, 'INR') + '…');
+      try { a.click(); } finally { document.body.removeChild(a); }
+    } else {
+      // Desktop / laptop: upi:// won't resolve here, so show a QR the user
+      // scans with any UPI app on their phone.
+      openUpiQrModal(user, amount, url);
+    }
+  }
+
+  // Desktop QR modal — renders the UPI intent as a scannable QR via a
+  // public chart image service, with a copy-link fallback.
+  function openUpiQrModal(user, amount, url) {
+    const qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=' + encodeURIComponent(url);
+    const body = h('div', { style: { textAlign: 'center' } }, [
+      h('p', { class: 'small muted', style: { margin: '0 0 16px' } },
+        'Scan with any UPI app to pay ' + userNameFull(user.id) + ' ' + fmtMoney(amount, 'INR') + '.'),
+      h('div', { style: { display: 'inline-flex', padding: '14px', background: '#fff', borderRadius: 'var(--r-4)', boxShadow: 'var(--sh-2)' } },
+        h('img', { src: qrSrc, width: '220', height: '220', alt: 'UPI QR code', style: { display: 'block', width: '220px', height: '220px' } })),
+      h('div', { class: 'small muted', style: { marginTop: '14px' } }, user.upi)
+    ]);
+    openInfoModal({ title: 'Pay via UPI', body, actions: [
+      { label: 'Copy UPI link', onClick: () => { copyText(url); toast('UPI link copied'); } }
+    ] });
+  }
+
+  // ---- WhatsApp ----
+  function waOpen(text, phone) {
+    // phone optional (E.164 digits, no +). Without it, WhatsApp lets the
+    // user pick a chat. With it, opens that contact directly.
+    const base = phone ? 'https://wa.me/' + String(phone).replace(/[^0-9]/g, '') : 'https://wa.me/';
+    const url = base + '?text=' + encodeURIComponent(text);
+    window.open(url, '_blank', 'noopener');
+  }
+  // Remind someone who owes YOU (or that you owe them) to settle, with a
+  // prefilled message and a tap-to-pay UPI link.
+  function remindViaWhatsApp(user, amount, direction) {
+    const me = State.users.find((u) => u.id === State.selfId);
+    const amt = fmtMoney(Math.abs(amount), 'INR');
+    let msg;
+    if (direction === 'owes-you') {
+      const payTo = me && me.upi ? ('\nPay me here: upi://pay?pa=' + me.upi + '&pn=' + encodeURIComponent(me.name) + '&am=' + Math.abs(amount).toFixed(2) + '&cu=INR') : '';
+      msg = 'Hi ' + user.name + ', a quick reminder — you owe me ' + amt + ' on Orbit.' + payTo + '\n\n— settled via Orbit';
+    } else {
+      msg = 'Hi ' + user.name + ', settling up ' + amt + ' with you via Orbit now. — ' + (me ? me.name : 'me');
+    }
+    waOpen(msg, user.phone);
+  }
+  // Invite a friend onto Orbit.
+  function inviteViaWhatsApp(user) {
+    const me = State.users.find((u) => u.id === State.selfId);
+    const msg = 'Hey' + (user && user.name ? ' ' + user.name : '') + '! I\'m using Orbit to split & settle expenses. Join me: ' +
+      location.origin + location.pathname + '\n\n— ' + (me ? me.name : 'me');
+    waOpen(msg, user && user.phone);
+  }
+  // WhatsApp glyph for settle-row buttons.
+  function waIcon() {
+    const wrap = document.createElement('span');
+    wrap.style.display = 'inline-flex';
+    wrap.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.13a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.11.82.83-3.04-.2-.31a8.22 8.22 0 0 1-1.26-4.36c0-4.54 3.7-8.23 8.23-8.23 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.69 8.23-8.23 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.22.25-.86.84-.86 2.05 0 1.21.88 2.38 1 2.54.12.17 1.73 2.64 4.19 3.7.59.25 1.04.4 1.4.52.59.19 1.12.16 1.54.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.28Z"/></svg>';
+    return wrap.firstElementChild;
+  }
+  function copyText(t) {
+    try { navigator.clipboard.writeText(t); } catch (_) {
+      const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+    }
   }
   async function markSettledModal(otherUserId, amount) {
     openConfirmModal({
@@ -1179,6 +1260,7 @@
         h('div', { class: 'amt' }, fmtMoney(t.amount, t.currency)),
         h('div', { class: 'actions' }, t.from === State.selfId ? [
           h('button', { class: 'btn-pay', onClick: () => payViaUPI(State.users.find((x) => x.id === t.to), t.amount) }, 'Pay'),
+          h('button', { class: 'btn-wa', title: 'Message on WhatsApp', onClick: () => remindViaWhatsApp(State.users.find((x) => x.id === t.to), t.amount, 'you-owe') }, waIcon()),
           h('button', { class: 'btn-mark', onClick: () => recordSettlement(g.id, t.from, t.to, t.amount, t.currency) }, 'Mark')
         ] : [
           h('button', { class: 'btn-mark', onClick: () => recordSettlement(g.id, t.from, t.to, t.amount, t.currency) }, 'Mark')
@@ -1236,6 +1318,7 @@
         h('div', { class: 'amt neg' }, fmtMoney(t.amount, t.currency)),
         h('div', { class: 'actions' }, [
           t.from === State.selfId && toU?.upi ? h('button', { class: 'btn-pay', onClick: () => payViaUPI(toU, t.amount) }, 'Pay via UPI') : null,
+          toU ? h('button', { class: 'btn-wa', title: 'Message on WhatsApp', onClick: () => remindViaWhatsApp(toU, t.amount, t.from === State.selfId ? 'you-owe' : 'owes-you') }, waIcon()) : null,
           h('button', { class: 'btn-mark', onClick: () => recordSettlement(g.id, t.from, t.to, t.amount, t.currency) }, 'Mark paid')
         ])
       ]));
@@ -2252,6 +2335,7 @@
               onClick: () => sendReminder(other, t.amount, cur)
             }, remRecent ? 'Reminded' : 'Remind') : null,
             !isOwed && otherU?.upi ? h('button', { class: 'btn-pay', onClick: () => payViaUPI(otherU, t.amount) }, 'Pay via UPI') : null,
+            otherU ? h('button', { class: 'btn-wa', title: 'Message on WhatsApp', onClick: () => remindViaWhatsApp(otherU, t.amount, isOwed ? 'owes-you' : 'you-owe') }, waIcon()) : null,
             h('button', { class: 'btn-mark', onClick: () => recordSettlement(t.groupId || '', t.from, t.to, t.amount, cur) }, 'Mark paid')
           ])
         ]));
@@ -2399,7 +2483,8 @@
       h('button', { class: 'btn btn-sm', onClick: () => exportReport('pdf') }, 'Export PDF'),
       h('button', { class: 'btn btn-sm', onClick: () => exportReport('xlsx') }, 'Export Excel'),
       h('button', { class: 'btn btn-sm', onClick: exportAllJson }, 'Download JSON'),
-      h('button', { class: 'btn btn-sm', onClick: resetToSeed }, 'Reset to seed data'),
+      h('button', { class: 'btn btn-sm', onClick: loadDemo }, 'Load demo data'),
+      h('button', { class: 'btn btn-sm', onClick: resetToSeed }, 'Clear to empty'),
       h('button', { class: 'btn btn-danger btn-sm', onClick: confirmDeleteAll }, 'Wipe all data')
     ]));
     cData.appendChild(dataBody);
@@ -2775,10 +2860,23 @@
   }
   async function resetToSeed() {
     openConfirmModal({
-      title: 'Reset to seed data?', bodyHtml: 'Replace current data with the demo Indian dataset.', confirmText: 'Reset',
+      title: 'Clear all data?', danger: true,
+      bodyHtml: 'This removes every group, expense and friend, leaving you with a clean, empty Orbit. This cannot be undone.',
+      confirmText: 'Clear everything',
       onConfirm: async () => {
         await OrbitDB.clearAll();
         await OrbitDB.setMeta('seeded', false);
+        try { if (window.OrbitCloud && OrbitCloud.user()) { for (const s of ['users','groups','expenses','settlements','activity','meta']) await OrbitCloud.clearStore(s); } } catch (_) {}
+        location.reload();
+      }
+    });
+  }
+  async function loadDemo() {
+    openConfirmModal({
+      title: 'Load demo data?', bodyHtml: 'Adds the sample Indian dataset (groups, friends, expenses) so you can explore. You can clear it afterwards.', confirmText: 'Load demo',
+      onConfirm: async () => {
+        if (window.loadDemoData) await loadDemoData();
+        try { if (window.OrbitCloud && OrbitCloud.user()) await OrbitCloud.pushAll(); } catch (_) {}
         location.reload();
       }
     });
@@ -2864,6 +2962,20 @@
         h('button', { class: 'btn btn-ghost btn-sm', onClick: closeModal }, 'Cancel'),
         h('button', { class: 'btn ' + (danger ? 'btn-danger' : 'btn-primary') + ' btn-sm', onClick: async () => { await onConfirm(); closeModal(); } }, confirmText)
       ])
+    ]);
+    openModal(modal);
+  }
+
+  // Generic info modal — title + arbitrary body node + optional action buttons.
+  function openInfoModal({ title, body, actions = [] }) {
+    const foot = h('div', { class: 'modal-foot' }, [
+      ...actions.map((a) => h('button', { class: 'btn btn-ghost btn-sm', onClick: () => { a.onClick && a.onClick(); } }, a.label)),
+      h('button', { class: 'btn btn-primary btn-sm', onClick: closeModal }, 'Done')
+    ]);
+    const modal = h('div', { class: 'modal modal-sm' }, [
+      h('div', { class: 'modal-head' }, [h('h2', {}, title), h('button', { class: 'close', onClick: closeModal }, '\u00d7')]),
+      h('div', { class: 'modal-body' }, body),
+      foot
     ]);
     openModal(modal);
   }
@@ -3842,6 +3954,11 @@
   }
 
   async function boot() {
+    // Tag the <html> with device type so CSS + JS can adapt layout/behavior.
+    try {
+      document.documentElement.classList.toggle('is-mobile', isMobileDevice());
+      document.documentElement.classList.toggle('is-desktop', !isMobileDevice());
+    } catch (_) {}
     await OrbitDB.init();
     await waitForCloud();
 
