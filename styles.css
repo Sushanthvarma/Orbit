@@ -649,6 +649,48 @@ svg { display: block; }
   box-shadow: var(--sh-3);
   border-color: var(--accent-line);
 }
+/* Group card internals — match design_handoff reference (.gc family). */
+.gc-head { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+.gc-emoji {
+  width: 38px; height: 38px; border-radius: 11px;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 700; color: var(--text-2);
+  flex-shrink: 0; line-height: 1;
+}
+.gc-name { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc-meta { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+.cur-pill {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--accent); background: var(--accent-soft);
+  padding: 1px 6px; border-radius: var(--r-1); vertical-align: middle;
+}
+.group-card .avatar-stack { margin-bottom: 14px; }
+.gc-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-3); }
+.gc-foot .right { text-align: right; }
+.gc-foot .small.muted { font-size: 11px; color: var(--text-disabled);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+.gc-foot .tabular { font-family: var(--font-display); font-size: 15px; font-weight: 600;
+  letter-spacing: -0.015em; }
+.gc-bal { font-family: var(--font-display); font-size: 20px; font-weight: 700;
+  letter-spacing: -0.025em; font-variant-numeric: tabular-nums; line-height: 1; }
+.gc-bal.pos { color: var(--pos); } .gc-bal.neg { color: var(--neg); } .gc-bal.zero { color: var(--text-disabled); }
+/* Activity bar at the bottom of each group card. */
+.group-card .gc-bar { height: 3px; background: rgba(10,10,15,.05); border-radius: 999px; margin-top: 14px; overflow: hidden; }
+.group-card .gc-fill { height: 100%; border-radius: 999px; background: var(--accent); }
+.group-card .gc-fill.neg { background: var(--neg); }
+.group-card .gc-fill.zero { background: var(--text-disabled); }
+
+/* ---------- Charts (inline SVG) ---------- */
+.chart-wrap { padding: var(--s-4) var(--s-5) var(--s-5); }
+svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+svg.chart .grid line { stroke: var(--line); stroke-width: 1; }
+svg.chart .grid text, svg.chart .label { fill: var(--text-disabled); font-size: 10px; font-family: var(--font-ui); }
+svg.chart .area-fill { fill: url(#accent-grad); }
+svg.chart .area-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+svg.chart .bar { fill: rgba(107,91,255,0.22); }
+svg.chart .bar.on { fill: url(#bar-grad); }
 
 /* ---------- Tabs ---------- */
 .tabs { display: flex; gap: var(--s-1); border-bottom: 1px solid var(--line); margin-bottom: var(--s-5); }

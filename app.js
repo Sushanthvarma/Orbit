@@ -527,9 +527,11 @@
     middle.appendChild(panelRecentActivity());
     const rightCol = h('div', { class: 'right-col' });
     rightCol.appendChild(panelSettleNow());
-    rightCol.appendChild(panelSpendChart28());
     middle.appendChild(rightCol);
     page.appendChild(middle);
+
+    // Spending chart — full width below the grid so the area chart has room.
+    page.appendChild(panelSpendChart28());
 
     setMain(page);
     // Wire the 3D mouse-tilt after the nodes are in the DOM.
@@ -980,7 +982,8 @@
     const balCls = bal > 0.01 ? 'pos' : bal < -0.01 ? 'neg' : 'zero';
     const groupExps = State.expenses.filter((e) => e.groupId === g.id);
     const total = groupExps.reduce((s, e) => s + e.amount, 0);
-    const last = lastActivityDate(g.id);
+    const maxExp = Math.max(1, ...State.groups.map((x) => State.expenses.filter((e) => e.groupId === x.id).length));
+    const pct = Math.max(8, Math.round((groupExps.length / maxExp) * 100));
     return h('div', { class: 'group-card', onClick: () => navigate('#/groups/' + g.id) }, [
       h('div', { class: 'gc-head' }, [
         h('div', { class: 'gc-emoji', data: { cat: g.category } }, g.emoji || g.name.slice(0, 2).toUpperCase()),
@@ -988,7 +991,7 @@
           h('div', { class: 'gc-name' }, g.name),
           h('div', { class: 'gc-meta' }, [
             h('span', { class: 'cur-pill' }, g.currency),
-            ' · ' + g.members.length + ' members · ' + (last ? fmtDateRel(last) : 'no activity')
+            ' · ' + g.members.length + ' members · ' + groupExps.length + ' expenses'
           ])
         ])
       ]),
@@ -996,13 +999,14 @@
       h('div', { class: 'gc-foot' }, [
         h('div', {}, [
           h('div', { class: 'small muted' }, 'Total spend'),
-          h('div', { class: 'tabular', style: { fontWeight: 600 } }, fmtMoney(total, g.currency))
+          h('div', { class: 'tabular' }, fmtMoney(total, g.currency))
         ]),
         h('div', { class: 'right' }, [
           h('div', { class: 'small muted' }, bal > 0 ? 'You are owed' : bal < 0 ? 'You owe' : 'Settled'),
           h('div', { class: 'gc-bal ' + balCls }, bal === 0 ? '—' : fmtMoney(Math.abs(bal), g.currency))
         ])
-      ])
+      ]),
+      h('div', { class: 'gc-bar' }, h('div', { class: 'gc-fill ' + balCls, style: { width: pct + '%' } }))
     ]);
   }
 
@@ -3895,7 +3899,6 @@
         await handleSignOut();
       } else {
         // Possibly a transient cold-boot null. Wait up to 1.5s for a
-        // signed-in callback. If none comes, treat as real signed-out.
         console.log('[Orbit] null on cold boot — waiting for late auth resolve');
         _signOutTimer = setTimeout(() => {
           _signOutTimer = null;
