@@ -450,6 +450,9 @@
     // Light up both the desktop sidebar item and the mobile tab-bar item.
     document.querySelectorAll(`.nav-item[data-route="${name}"], .tab-item[data-route="${name}"]`)
       .forEach((el) => el.classList.add('active'));
+    // Routes that live under the mobile "More" sheet light up that tab.
+    const more = document.querySelector('#tabMore');
+    if (more && ['expenses', 'settle', 'trips', 'analytics', 'profile'].includes(name)) more.classList.add('active');
   }
   function renderSidebarGroups() {
     const root = $('#sidebarGroups');
@@ -3227,6 +3230,33 @@
     openModal(modal);
   }
 
+  // Mobile "More" sheet — the bottom tab bar only has 5 slots, so the nav
+  // destinations that don't fit (Expenses, Settle up, Trips, Analytics,
+  // Profile) live here, plus a quick "New group" action.
+  function openMoreMenu() {
+    const items = [
+      { route: 'expenses', label: 'Expenses', icon: 'E' },
+      { route: 'settle', label: 'Settle up', icon: 'S' },
+      { route: 'trips', label: 'Trips', icon: 'T' },
+      { route: 'analytics', label: 'Analytics', icon: 'N' },
+      { route: 'profile', label: 'Profile', icon: 'P' }
+    ];
+    const modal = h('div', { class: 'modal modal-sm' });
+    modal.appendChild(h('div', { class: 'modal-head' }, [h('h2', {}, 'More'), h('button', { class: 'close', onClick: closeModal }, '×')]));
+    const body = h('div', { class: 'modal-body' });
+    const list = h('div', { class: 'more-list' });
+    items.forEach((it) => {
+      list.appendChild(h('button', { class: 'more-item' + (State.route.name === it.route ? ' active' : ''), onClick: () => { closeModal(); navigate('#/' + it.route); } }, [
+        h('span', { class: 'more-icon' }, it.icon),
+        h('span', { class: 'more-label' }, it.label)
+      ]));
+    });
+    body.appendChild(list);
+    body.appendChild(h('button', { class: 'btn btn-primary', style: { width: '100%', marginTop: '14px', justifyContent: 'center' }, onClick: () => { closeModal(); openNewGroup(); } }, '+ New group'));
+    modal.appendChild(body);
+    openModal(modal);
+  }
+
   // Minimal token-compliant switch. Returns a button[role=switch]; calls
   // onChange(bool) on toggle. Iris accent when on, 999 radius.
   function orbitSwitch(initial, onChange) {
@@ -4017,6 +4047,8 @@
     $('#newExpenseTop').addEventListener('click', () => openExpenseModal());
     const tabAdd = $('#tabAdd');
     if (tabAdd) tabAdd.addEventListener('click', () => openExpenseModal());   // mobile tab-bar add
+    const tabMore = $('#tabMore');
+    if (tabMore) tabMore.addEventListener('click', openMoreMenu);             // mobile "More" sheet
     const aiBtn = $('#aiQuickTop');
     if (aiBtn) aiBtn.addEventListener('click', () => openAIQuickAdd());
     const themeBtn = $('#themeToggle');
