@@ -3684,33 +3684,84 @@
     });
   }
 
+  // Bounded wait so a hung Firestore call can't strand the user on a blank
+  // page. Resolves to a sentinel { __timeout: true } instead of throwing so
+  // the caller can branch cleanly.
+  function withTimeout(promise, ms, label) {
+    return new Promise((resolve) => {
+      let done = false;
+      const t = setTimeout(() => {
+        if (done) return;
+        done = true;
+        console.warn('[Orbit] ' + label + ' timed out after ' + ms + 'ms');
+        resolve({ __timeout: true });
+      }, ms);
+      Promise.resolve(promise).then(
+        (v) => { if (done) return; done = true; clearTimeout(t); resolve(v); },
+        (e) => { if (done) return; done = true; clearTimeout(t); console.warn('[Orbit] ' + label + ' failed', e); resolve({ __error: e }); }
+      );
+    });
+  }
+
   async function enterApp() {
-    // First-time-on-this-account flow:
-    //  - if Firestore has data for this uid → pull it into IndexedDB
-    //  - else seed locally and push to Firestore
-    const hasRemote = await OrbitCloud.hasRemoteData();
-    if (hasRemote) {
-      // Wipe any local state from previous account/session, then pull fresh.
-      await OrbitDB.clearAll();
-      await OrbitCloud.pullAll();
-    } else {
-      // New account — seed local demo data, then push it up.
-      await seedIfNeeded();
-      await OrbitCloud.pushAll();
+    console.log('[Orbit] enterApp: start');
+    // Cloud sync block — wrapped in try/catch + per-call timeouts so a hung
+    // or failed Firestore round-trip drops the user into local-only mode
+    // with a visible toast, never an empty shell.
+    let cloudOk = true;
+    try {
+      console.log('[Orbit] enterApp: hasRemoteData...');
+      const remote = await withTimeout(OrbitCloud.hasRemoteData(), 10000, 'hasRemoteData');
+      if (remote && remote.__timeout) throw new Error('hasRemoteData timed out');
+      if (remote && remote.__error) throw remote.__error;
+      const hasRemote = !!remote;
+      console.log('[Orbit] enterApp: hasRemote=' + hasRemote);
+
+      if (hasRemote) {
+        await OrbitDB.clearAll();
+        const pulled = await withTimeout(OrbitCloud.pullAll(), 15000, 'pullAll');
+        if (pulled && pulled.__timeout) throw new Error('pullAll timed out');
+        if (pulled && pulled.__error) throw pulled.__error;
+        console.log('[Orbit] enterApp: pullAll done', pulled);
+      } else {
+        await seedIfNeeded();
+        const pushed = await withTimeout(OrbitCloud.pushAll(), 15000, 'pushAll');
+        if (pushed && pushed.__timeout) throw new Error('pushAll timed out');
+        if (pushed && pushed.__error) throw pushed.__error;
+        console.log('[Orbit] enterApp: pushAll done');
+      }
+    } catch (e) {
+      cloudOk = false;
+      console.error('[Orbit] Cloud sync failed, falling back to local-only mode', e);
+      // Make sure there's *something* to render. If we cleared local state
+      // and the pull never landed, seed so the dashboard isn't empty.
+      try {
+        const existing = await OrbitDB.getAll('users');
+        if (!existing.length) await seedIfNeeded();
+      } catch (_) {}
     }
-    // Make sure the signed-in Firebase user is reflected as 'self' in our user store
-    await ensureSelfUserMatchesAuth();
+
+    try {
+      await ensureSelfUserMatchesAuth();
+    } catch (e) {
+      console.warn('[Orbit] ensureSelfUserMatchesAuth failed', e);
+    }
     await loadAll();
-    // Recurring engine — spawn any due clones since last visit
     try {
       if (window.OrbitRecurring) {
         const r = await OrbitRecurring.processRecurring(OrbitDB, State);
         if (r.spawned > 0) toast(r.spawned + ' recurring expense' + (r.spawned > 1 ? 's' : '') + ' added', 'pos');
       }
     } catch (e) { console.warn('Recurring engine failed', e); }
+
+    console.log('[Orbit] enterApp: rendering shell');
     hideLoginGate();
     bindAppOnce();
     route();
+
+    if (!cloudOk) {
+      toast('Sync unavailable — working offline. Changes save locally.', 'warn');
+    }
   }
 
   async function ensureSelfUserMatchesAuth() {
