@@ -145,6 +145,18 @@
   function sharedIdOf(g) { return g ? (g.sharedId || (g.shared ? g.id : null)) : null; }
   function canShare() { return !!(window.OrbitGroups && OrbitGroups.isReady()); }
 
+  // ---- Identity handles (foundation for email/phone auto-claim) ----
+  // A contact's claimable identity is a normalized email or phone. When that
+  // person later signs in, their verified handle is matched to these and the
+  // ghost contact is claimed (Phase 2). Name is only a display label.
+  function normEmail(s) { return (s || '').trim().toLowerCase(); }
+  function normPhone(s) {
+    let d = (s || '').replace(/[^\d+]/g, '');
+    if (d && !d.startsWith('+') && d.length === 10) d = '+91' + d; // India default
+    return d;
+  }
+  function personHandle(u) { return u ? (normEmail(u.email) || normPhone(u.phone) || '') : ''; }
+
   // Dual-write an expense to its group's Firestore copy when the group is
   // shared. Same id as the local record → realtime merge is idempotent.
   // Best-effort: a cloud failure never blocks the local save.
@@ -3290,7 +3302,7 @@
   }
 
   function openAddMemberModal(group) {
-    const data = { picked: '', newName: '' };
+    const data = { picked: '', newName: '', newEmail: '', newPhone: '' };
     const modal = h('div', { class: 'modal modal-sm' }, [
       h('div', { class: 'modal-head' }, [h('h2', {}, 'Add member'), h('button', { class: 'close', onClick: closeModal }, '×')])
     ]);
@@ -3304,13 +3316,22 @@
       body.appendChild(formRow('From contacts', sel));
     }
     body.appendChild(formRow('Or new person', h('input', { class: 'input', placeholder: 'Name', onInput: (e) => { data.newName = e.target.value; } })));
+    // Email / phone make this person claimable when they sign in (so the
+    // expenses you tag them in become really theirs). Optional but recommended.
+    body.appendChild(formRow('Email (optional)', h('input', { class: 'input', type: 'email', placeholder: 'name@email.com', onInput: (e) => { data.newEmail = e.target.value; } })));
+    body.appendChild(formRow('Phone (optional)', h('input', { class: 'input', type: 'tel', placeholder: '+91 98765 43210', onInput: (e) => { data.newPhone = e.target.value; } })));
+    body.appendChild(h('div', { class: 'small muted', style: { marginTop: '-4px' } }, 'Adding an email or phone lets them claim their share when they join Orbit.'));
     modal.appendChild(body);
     modal.appendChild(h('div', { class: 'modal-foot' }, [
       h('button', { class: 'btn btn-ghost btn-sm', onClick: closeModal }, 'Cancel'),
       h('button', { class: 'btn btn-primary btn-sm', onClick: async () => {
         let userId = data.picked;
         if (!userId && data.newName.trim()) {
-          const u = { id: uid('u'), name: data.newName.trim(), isSelf: false, avatar: 'av-c' + ((State.users.length % 8) + 1), email: '', upi: '' };
+          const u = {
+            id: uid('u'), name: data.newName.trim(), isSelf: false,
+            avatar: 'av-c' + ((State.users.length % 8) + 1),
+            email: normEmail(data.newEmail), phone: normPhone(data.newPhone), upi: ''
+          };
           await OrbitDB.put('users', u);
           State.users.push(u);
           userId = u.id;
