@@ -3541,7 +3541,7 @@
     // expenses you tag them in become really theirs). Optional but recommended.
     body.appendChild(formRow('Email (optional)', emailInp));
     body.appendChild(formRow('Phone (optional)', phoneInp));
-    body.appendChild(h('div', { class: 'small muted', style: { marginTop: '-4px' } }, 'Adding an email or phone lets them claim their share when they join Orbit.'));
+    body.appendChild(h('div', { class: 'small muted', style: { marginTop: '-4px' } }, 'Add an email or phone so they auto-join and their tagged expenses become really theirs. Without one, they can only join via an invite link.'));
     modal.appendChild(body);
     modal.appendChild(h('div', { class: 'modal-foot' }, [
       h('button', { class: 'btn btn-ghost btn-sm', onClick: closeModal }, 'Cancel'),
@@ -3572,10 +3572,14 @@
         if (group.members.includes(userId)) { toast('Already in this group'); closeModal(); return; }
         group.members.push(userId);
         await OrbitDB.put('groups', group);
-        // Shared group + the member has an email/phone → register a claimable
-        // ghost so they auto-link when they sign in (Phase 2 auto-claim).
+        // Shared group: the person needs a real path into the cloud group.
+        //  - With an email/phone → register a claimable ghost so they
+        //    auto-link the moment they sign in (and WhatsApp them the invite).
+        //  - Without either → they can't auto-link, so an invite LINK is the
+        //    only reliable way in. Surface the share flow instead of silently
+        //    leaving a dead local-only name.
         const sid = sharedIdOf(group);
-        let inviteUrl = null;
+        let inviteUrl = null, needsInvite = false;
         if (sid && canShare()) {
           const m = State.users.find((x) => x.id === userId);
           if (m && (m.email || m.phone)) {
@@ -3588,10 +3592,17 @@
                 waOpen('Hi ' + (m.name || '') + '! Join our “' + group.name + '” group on Orbit to split & settle our expenses: ' + inv.url, m.phone);
               } catch (_) {}
             }
+          } else {
+            needsInvite = true;
           }
         }
         closeModal();
-        toast(inviteUrl ? 'Added — invite sent' : 'Added');
+        if (needsInvite) {
+          toast('Add an email or phone to auto-link them — or send this invite', 'warn');
+          inviteToGroup(group);   // open the share-link flow so they can actually join
+        } else {
+          toast(inviteUrl ? 'Added — invite sent' : 'Added');
+        }
         render();
       } }, 'Add')
     ]));
@@ -4777,7 +4788,7 @@
         _started = true;
         console.log('[Realtime] starting shared-group listeners');
         // Live list of my shared groups.
-        _groupsUnsub = OrbitGroups.onMyGroups((groups) => {
+        _groupsUnsub = OrbitGroups.onMyGroups(async (groups) => {
           // Notify when a NEW member appears in a group — even across sessions.
           // We persist the last-seen member set per group in localStorage, so
           // when you reopen the app after someone joined while you were away,
@@ -4810,6 +4821,23 @@
           });
           const tagged = groups.map((g) => normalizeSharedGroup(g));
           State.groups = mergeById(State.groups, tagged);
+          // Persist shared groups locally so they render instantly on the next
+          // reload — even before realtime reconnects. This is why a joined
+          // group no longer vanishes on re-login.
+          for (const g of tagged) { try { await OrbitDB.put('groups', g); } catch (_) {} }
+          // Reconcile: drop any locally-cached SHARED group the server no longer
+          // lists for me (I left it, or was removed) so it doesn't linger. The
+          // `_prevMembers[g.id]` guard means we only delete a group we've SEEN
+          // in a prior snapshot — a freshly-created group still awaiting its
+          // first realtime echo is never reconciled away.
+          const liveIds = new Set(tagged.map((g) => g.id));
+          const stale = State.groups.filter((g) => isSharedGroup(g) && !liveIds.has(g.id) && _prevMembers[g.id]);
+          for (const g of stale) {
+            State.groups = State.groups.filter((x) => x.id !== g.id);
+            try { await OrbitDB.delete('groups', g.id); } catch (_) {}
+            try { localStorage.removeItem('orbit_members_' + g.id); } catch (_) {}
+            delete _prevMembers[g.id];
+          }
           // (Re)subscribe to each shared group's expenses + activity feed.
           tagged.forEach((g) => { watchGroupExpenses(g.id); watchGroupActivity(g.id); });
           softRerender();

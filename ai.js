@@ -65,10 +65,33 @@
     ].join('\n');
   }
 
+  // Slim the context down to what the server prompt needs (names + group meta),
+  // so we never ship internal ids or amounts to the proxy.
+  function slimCtx(ctx) {
+    return {
+      contacts: (ctx.contacts || []).map((c) => ({ name: c.name, isSelf: !!c.isSelf })),
+      groups: (ctx.groups || []).map((g) => ({ name: g.name, currency: g.currency, memberCount: g.memberCount })),
+      categories: ctx.categories
+    };
+  }
+
   async function parseExpense(text, ctx = {}) {
+    if (!text || !text.trim()) return { ok: false, error: 'empty-input' };
+
+    // Prefer the SHARED server-side key (signed-in users need no key of their
+    // own). Only fall back to a local/per-device key if the proxy is
+    // unavailable or no server key is configured.
+    if (!ctx.apiKey && global.OrbitGroups && OrbitGroups.isReady && OrbitGroups.isReady() && OrbitGroups.aiParse) {
+      try {
+        const r = await OrbitGroups.aiParse(text, slimCtx(ctx));
+        if (r && r.ok) return { ok: true, parsed: r.parsed, raw: r.raw };
+        // 'no-server-key' → fall through to local key; other errors are real.
+        if (r && r.error && r.error !== 'no-server-key') return { ok: false, error: r.error, raw: r.raw };
+      } catch (e) { /* proxy unreachable — fall back to a local key below */ }
+    }
+
     const key = ctx.apiKey || await getKey();
     if (!key) return { ok: false, error: 'needs-key' };
-    if (!text || !text.trim()) return { ok: false, error: 'empty-input' };
 
     const prompt = buildPrompt(text, ctx);
     let body;

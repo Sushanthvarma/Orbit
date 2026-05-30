@@ -10,12 +10,17 @@
    Region:  asia-south1 (Mumbai) — closest to India-first users.
    ============================================================ */
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 initializeApp();
 const db = getFirestore();
 const REGION = 'asia-south1';
+
+// Shared Gemini key so end users never need their own. Set once with:
+//   firebase functions:secrets:set GEMINI_API_KEY
+const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 
 /**
  * acceptInvite({ code }) — callable.
@@ -251,4 +256,111 @@ export const claimPending = onCall({ region: REGION }, async (request) => {
     }
   }
   return { ok: true, claimed };
+});
+
+/* ============================================================
+   aiParse({ text, ctx }) — callable.
+   Natural-language → structured expense JSON, using ONE server-held
+   Gemini key so no end user needs their own. Auth-gated, with a soft
+   per-user daily cap so the shared key can't be run away with. The
+   prompt is built server-side (clients send only text + lightweight
+   context) so the key can't be repurposed for arbitrary prompts.
+   ============================================================ */
+const GEMINI_ENDPOINT =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const AI_DAILY_CAP = 50; // per user per UTC day
+
+function buildExpensePrompt(text, ctx) {
+  ctx = ctx || {};
+  const contacts = (ctx.contacts || [])
+    .map((c) => '- ' + c.name + (c.isSelf ? ' (the user themselves)' : '')).join('\n');
+  const groups = (ctx.groups || [])
+    .map((g) => '- "' + g.name + '" (' + g.currency + ', ' + g.memberCount + ' members)').join('\n');
+  const cats = (ctx.categories || ['food', 'travel', 'bills', 'shop', 'fun', 'rent', 'transport', 'other']).join(', ');
+  return [
+    'You are an expense-splitting parser. Given a user message, output strict JSON only.',
+    '',
+    'JSON schema:',
+    '{',
+    '  "title": string,',
+    '  "amount": number,',
+    '  "currency": "INR"|"USD"|"EUR"|"GBP",',
+    '  "category": one of: ' + cats + ',',
+    '  "paidByName": string,',
+    '  "groupName": string|null,',
+    '  "participants": string[],',
+    '  "splitMode": "equal"|"exact"|"percent"|"shares",',
+    '  "splits": [{ "name": string, "value": number }] | null',
+    '}',
+    '',
+    'Defaults: currency INR, category "other", paidByName "self", splitMode "equal".',
+    'Rules:',
+    '- Match names case-insensitively to the contacts list. If "I", "me", "myself" -> "self".',
+    '- For percent splits the sum of values must equal 100. For exact, must equal amount.',
+    '- For shares, values are integer share counts.',
+    '- If the user just says "split with X and Y" with no ratio -> splitMode "equal", splits null.',
+    '- If you cannot identify a group from the list, set groupName to null.',
+    '- Output JSON only. No code fences, no commentary.',
+    '',
+    'Contacts available:',
+    contacts || '(none)',
+    '',
+    'Groups available:',
+    groups || '(none)',
+    '',
+    'User message:',
+    '"' + String(text).replace(/"/g, '\\"') + '"'
+  ].join('\n');
+}
+
+export const aiParse = onCall({ region: REGION, secrets: [GEMINI_API_KEY] }, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in to use Quick add.');
+  const text = request.data && request.data.text;
+  if (!text || !String(text).trim()) throw new HttpsError('invalid-argument', 'Nothing to parse.');
+
+  const key = GEMINI_API_KEY.value();
+  if (!key) return { ok: false, error: 'no-server-key' }; // lets the client fall back to a local key
+
+  // Soft per-user daily cap (UTC day) to protect the shared key.
+  const today = new Date().toISOString().slice(0, 10);
+  const usageRef = db.doc(`aiUsage/${uid}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(usageRef);
+    const d = snap.exists ? snap.data() : {};
+    const count = d.day === today ? (d.count || 0) : 0;
+    if (count >= AI_DAILY_CAP) throw new HttpsError('resource-exhausted', 'Daily AI limit reached. Try again tomorrow.');
+    tx.set(usageRef, { day: today, count: count + 1, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  });
+
+  const prompt = buildExpensePrompt(text, request.data && request.data.ctx);
+  let body;
+  try {
+    const res = await fetch(GEMINI_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', temperature: 0 }
+      })
+    });
+    if (!res.ok) {
+      const txt = (await res.text().catch(() => '')).split(key).join('***');
+      return { ok: false, error: 'http-' + res.status, raw: txt };
+    }
+    body = await res.json();
+  } catch (e) {
+    return { ok: false, error: 'network', raw: String(e) };
+  }
+
+  const partText = (body && body.candidates && body.candidates[0] &&
+    body.candidates[0].content && body.candidates[0].content.parts &&
+    body.candidates[0].content.parts[0] && body.candidates[0].content.parts[0].text) || '';
+  let parsed;
+  try {
+    parsed = JSON.parse(partText.trim().replace(/^```json\s*|\s*```$/g, ''));
+  } catch (_) {
+    return { ok: false, error: 'parse', raw: partText };
+  }
+  return { ok: true, parsed, raw: partText };
 });

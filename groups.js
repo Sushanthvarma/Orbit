@@ -180,6 +180,14 @@ const OrbitGroups = {
     const res = await call({ groupId, memberUid });
     return res.data;
   },
+  // Quick add NL parsing via the SHARED server-side Gemini key — no per-user
+  // key needed. Returns { ok, parsed, raw } | { ok:false, error }.
+  async aiParse(text, ctx) {
+    if (!ensure() || !uid()) throw new Error('Not signed in');
+    const call = httpsCallable(_functions, 'aiParse');
+    const res = await call({ text, ctx: ctx || {} });
+    return res.data;
+  },
 
   // ---- Identity: ghost members + auto-claim (Phase 2) ----
   // Add a "ghost" placeholder (a person invited by email/phone who hasn't
