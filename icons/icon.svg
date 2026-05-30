@@ -1,7 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <g transform="translate(32 32)">
-    <ellipse rx="27" ry="13" fill="none" stroke="#6B5BFF" stroke-width="4.2" transform="rotate(-26)"/>
-    <circle r="12.5" fill="#6B5BFF"/>
-    <circle cx="24.3" cy="-11.8" r="4.3" fill="#8A7CFF"/>
+  <defs>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9C8FFF"/>
+      <stop offset="100%" stop-color="#6B5BFF"/>
+    </linearGradient>
+    <radialGradient id="sphere" cx="0.36" cy="0.30" r="0.85">
+      <stop offset="0%" stop-color="#B4A8FF"/>
+      <stop offset="55%" stop-color="#6B5BFF"/>
+      <stop offset="100%" stop-color="#5A49E6"/>
+    </radialGradient>
+  </defs>
+  <g transform="translate(32 32) rotate(-24)">
+    <ellipse rx="28" ry="12.8" fill="none" stroke="url(#ring)" stroke-width="4" stroke-linecap="round"/>
+    <circle r="11" fill="url(#sphere)"/>
+    <circle cx="28" cy="0" r="4.4" fill="#6B5BFF"/>
+    <circle cx="-28" cy="0" r="2.8" fill="#B4A8FF"/>
   </g>
 </svg>

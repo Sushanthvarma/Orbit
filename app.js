@@ -4072,7 +4072,7 @@
     const card = h('div', { class: 'login-card' });
 
     const gateMark = h('span', { class: 'brand-mark', 'aria-hidden': 'true', style: { width: '40px', height: '40px' } });
-    gateMark.innerHTML = '<svg viewBox="0 0 32 32" fill="none"><g transform="translate(16 16)"><ellipse rx="13.5" ry="6.4" fill="none" stroke="#6B5BFF" stroke-width="2.2" transform="rotate(-26)"/><circle r="6" fill="#6B5BFF"/><circle cx="12.1" cy="-5.9" r="2.1" fill="#8A7CFF"/></g></svg>';
+    gateMark.innerHTML = '<svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="oggr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9C8FFF"/><stop offset="1" stop-color="#6B5BFF"/></linearGradient><radialGradient id="oggp" cx="0.36" cy="0.3" r="0.85"><stop offset="0" stop-color="#B4A8FF"/><stop offset="55%" stop-color="#6B5BFF"/><stop offset="1" stop-color="#5A49E6"/></radialGradient></defs><g transform="translate(16 16) rotate(-24)"><ellipse rx="14" ry="6.4" fill="none" stroke="url(#oggr)" stroke-width="2" stroke-linecap="round"/><circle r="5.4" fill="url(#oggp)"/><circle cx="14" cy="0" r="2.2" fill="#6B5BFF"/><circle cx="-14" cy="0" r="1.4" fill="#B4A8FF"/></g></svg>';
     card.appendChild(h('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '12px', marginBottom: '4px' } }, [
       gateMark,
       h('span', { class: 'brand-name', style: { fontSize: '20px' } }, 'Orbit')
