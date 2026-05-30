@@ -1216,3 +1216,20 @@ th.sorted .sort-arrow { color: var(--accent); }
 }
 .btn-wa:hover { background: #25D366; color: #fff; border-color: transparent; transform: translateY(-1px); box-shadow: var(--sh-2); }
 .btn-wa svg { width: 15px; height: 15px; }
+
+/* ====================================================================
+   Responsive overrides — MUST be last so they win over the late-defined
+   "pixel pass" grids (.stat-strip / .trip-kpis / .trip-body).
+   ==================================================================== */
+@media (max-width: 920px) {
+  .stat-strip { grid-template-columns: repeat(2, 1fr); }
+  .trip-kpis  { grid-template-columns: repeat(2, 1fr); }
+  .trip-body  { grid-template-columns: 1fr; }
+  .hbar-row   { grid-template-columns: 90px 1fr auto; }
+  .trip-summary { flex-wrap: wrap; }
+  .trip-summary > .stat { flex: 1 1 40%; }
+}
+@media (max-width: 560px) {
+  .stat-strip { grid-template-columns: 1fr 1fr; }
+  .trip-kpis  { grid-template-columns: 1fr 1fr; }
+}
