@@ -984,6 +984,10 @@ svg.chart .bar.on { fill: url(#bar-grad); }
     grid-template-columns: 1fr;
   }
   .sidebar { display: none; }
+  /* Main was placed in grid-column 2 (beside the sidebar); on mobile the
+     sidebar is gone, so pull it into the single column or it leaves an empty
+     gap on the left and everything squeezes right. */
+  .main { grid-column: 1; grid-row: 2; }
 
   /* Glass tab bar takes over navigation */
   .tabbar {
@@ -998,19 +1002,38 @@ svg.chart .bar.on { fill: url(#bar-grad); }
     box-shadow: 0 -8px 24px rgba(10,10,15,0.08);
   }
 
-  /* Topbar: keep brand + actions, drop search/breadcrumbs to save width */
-  .topbar { grid-template-columns: 1fr auto; padding: 0 var(--s-4); }
+  /* Topbar: flex (not grid) so it reliably spans full width; keep brand +
+     actions, drop search/breadcrumbs to save width. */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; box-sizing: border-box;
+    position: sticky; top: 0; padding: 0 var(--s-4);
+  }
+  .topbar-left { flex: 1 1 auto; min-width: 0; }
+  .topbar-right { flex: 0 0 auto; }
   .topbar-center, .crumbs, .brand-divider { display: none; }
   #newExpenseTop { display: none; }              /* redundant with tab-bar add */
+  #aiQuickTop span:not(:empty) { display: none; }/* icon-only on mobile */
+  #aiQuickTop { padding: 8px 10px; }
 
   /* Main scrolls; leave room for the fixed tab bar */
   .main { padding: var(--s-4) var(--s-4) calc(72px + env(safe-area-inset-bottom)); }
+
+  /* Page header stacks; actions go full width below the title */
+  .page-header { flex-direction: column; align-items: stretch; gap: 14px; }
+  .page-header h1 { font-size: 24px; line-height: 1.1; }
+  .page-header .actions, .actions { width: 100%; }
+  .page-header .actions .btn { flex: 1 1 auto; justify-content: center; }
 
   /* Stack the multi-column layouts */
   .grid-2, .grid-2.content-grid, .input-row, .input-row-3 { grid-template-columns: 1fr; }
   .group-grid { grid-template-columns: 1fr 1fr; }
   .kpi-grid, .kpi-grid.bal-row, .kpi-grid.kpi-grid-3 { grid-template-columns: 1fr; }
-  .kpi-orbit { opacity: 0.5; }
+
+  /* KPI cards: smaller value, no ornament crowding the number on narrow cards */
+  .kpi, .kpi.kpi-hero { padding: 18px 18px; }
+  .kpi-value, .kpi.kpi-hero .kpi-value { font-size: 30px; white-space: normal; overflow-wrap: anywhere; }
+  .kpi-orbit { display: none; }
 
   /* Modals become bottom sheets */
   .modal-backdrop { align-items: flex-end; }
