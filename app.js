@@ -2702,6 +2702,12 @@
     cData.appendChild(dataBody);
     page.appendChild(cData);
 
+    const credit = h('div', { style: { textAlign: 'center', margin: 'var(--s-6) 0 var(--s-4)', fontSize: '12.5px', color: 'var(--text-3)' } }, [
+      'Orbit · Built by ',
+      h('a', { href: 'https://www.linkedin.com/in/sushanthvarmasl/', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)', fontWeight: '600' } }, 'Sushanth Varma ↗')
+    ]);
+    page.appendChild(credit);
+
     setMain(page);
   }
   async function signOutFromProfile() {
@@ -4177,6 +4183,9 @@
     }
 
     card.appendChild(h('div', { class: 'login-fine' }, 'Local-first ledger · We never hold money · Settle via UPI · End-to-end yours.'));
+    const credit = h('div', { class: 'login-fine', style: { marginTop: '8px' } });
+    credit.appendChild(h('a', { href: 'https://www.linkedin.com/in/sushanthvarmasl/', target: '_blank', rel: 'noopener', style: { color: 'var(--text-3)', fontWeight: '500' } }, 'Built by Sushanth Varma ↗'));
+    card.appendChild(credit);
     gate.appendChild(card);
   }
   function hideLoginGate() {
