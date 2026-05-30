@@ -851,7 +851,7 @@ if (typewriterEl) {
 <script src="firebase-config.js"></script>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, setPersistence, browserLocalPersistence }
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence }
     from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
 
   const cfg = window.FIREBASE_CONFIG;
@@ -868,7 +868,11 @@ if (typewriterEl) {
   } else {
     const app = initializeApp(cfg);
     const auth = getAuth(app);
-    try { await setPersistence(auth, browserLocalPersistence); } catch (_) {}
+    try {
+      await setPersistence(auth, indexedDBLocalPersistence);
+    } catch (_) {
+      try { await setPersistence(auth, browserLocalPersistence); } catch (_) {}
+    }
 
     // Pick up Safari/iOS redirect-flow results, then react to auth state.
     try { await getRedirectResult(auth); } catch (_) {}

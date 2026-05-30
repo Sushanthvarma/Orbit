@@ -15,7 +15,8 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/fireba
 import {
   getAuth, GoogleAuthProvider,
   signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
-  onAuthStateChanged, setPersistence, browserLocalPersistence
+  onAuthStateChanged, setPersistence,
+  browserLocalPersistence, indexedDBLocalPersistence
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
 import {
   getFirestore, collection, doc,
@@ -58,7 +59,14 @@ const OrbitCloud = {
     _app = initializeApp(window.FIREBASE_CONFIG);
     _auth = getAuth(_app);
     _db = getFirestore(_app);
-    try { await setPersistence(_auth, browserLocalPersistence); } catch (_) {}
+    // IndexedDB persistence is more robust on GitHub Pages and survives
+    // third-party-cookie restrictions; fall back to localStorage if it's
+    // unavailable (e.g. private mode on older browsers).
+    try {
+      await setPersistence(_auth, indexedDBLocalPersistence);
+    } catch (_) {
+      try { await setPersistence(_auth, browserLocalPersistence); } catch (_) {}
+    }
 
     // Pick up any pending redirect-based sign-in (Safari / iOS fallback).
     try {

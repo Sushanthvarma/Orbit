@@ -3759,27 +3759,55 @@
     await OrbitCloud.init();
     installCloudWriteThrough();
 
+    // Track whether we've EVER seen a signed-in user this session. Used to
+    // distinguish a real sign-out from a transient null on cold-boot before
+    // Firebase has read the persisted session from IndexedDB.
+    let _seenSignedIn = false;
+    let _signOutTimer = null;
+
     OrbitCloud.onAuthChange(async (user) => {
+      console.log('[Orbit] onAuthChange:', user ? `signed in as ${user.email}` : 'no user');
+      if (_signOutTimer) { clearTimeout(_signOutTimer); _signOutTimer = null; }
+
       if (user) {
+        _seenSignedIn = true;
         try {
           await enterApp();
         } catch (e) {
-          console.error('Boot after sign-in failed', e);
+          console.error('[Orbit] Boot after sign-in failed', e);
           toast('Sync failed: ' + (e.message || e.code), 'neg');
         }
-      } else {
-        // Signed out — clear local state and redirect to the marketing landing.
-        // (The landing's "Continue with Google" button will trigger sign-in and
-        // bring the user back here.)
+        return;
+      }
+
+      // user is null. Two cases:
+      //  (a) Cold boot, Firebase hasn't loaded persisted session yet — wait
+      //      a moment for it to resolve before treating this as a sign-out.
+      //  (b) Genuine sign-out (we already saw a signed-in state, or wait
+      //      timed out) — clear local state and redirect to landing.
+      const handleSignOut = async () => {
+        console.log('[Orbit] handling sign-out (seenSignedIn=' + _seenSignedIn + ')');
         await OrbitDB.clearAll();
         State.users = []; State.groups = []; State.expenses = []; State.settlements = [];
-        // Allow ?stay=1 to skip the redirect (useful when developing the login card)
         const params = new URLSearchParams(location.search);
         if (params.get('stay') === '1') {
           renderLoginGate({ mode: 'signed-out' });
         } else {
           location.replace('./landing.html');
         }
+      };
+
+      if (_seenSignedIn) {
+        // Real sign-out — act immediately.
+        await handleSignOut();
+      } else {
+        // Possibly a transient cold-boot null. Wait up to 1.5s for a
+        // signed-in callback. If none comes, treat as real signed-out.
+        console.log('[Orbit] null on cold boot — waiting for late auth resolve');
+        _signOutTimer = setTimeout(() => {
+          _signOutTimer = null;
+          if (!_seenSignedIn) handleSignOut();
+        }, 1500);
       }
     });
   }
