@@ -54,13 +54,20 @@ export const acceptInvite = onCall({ region: REGION }, async (request) => {
     const members = group.memberUids || [];
 
     if (!members.includes(uid)) {
+      const joinedName = profile.name || 'New member';
       tx.update(groupRef, {
         memberUids: FieldValue.arrayUnion(uid),
         [`members.${uid}`]: {
-          name: profile.name || 'New member',
+          name: joinedName,
           upi: profile.upi || '',
           avatar: 'av-c' + ((members.length % 8) + 1)
         }
+      });
+      // Persistent "X joined" entry in the group's activity feed (deterministic
+      // id so a re-accept never duplicates it).
+      tx.set(db.doc(`groups/${invite.groupId}/activity/join_${uid}`), {
+        type: 'member_joined', actorUid: uid, actorName: joinedName,
+        createdAt: FieldValue.serverTimestamp()
       });
     }
     // Index the group on the user's profile for fast listing.
@@ -149,6 +156,10 @@ export const claimPending = onCall({ region: REGION }, async (request) => {
         if (!members.includes(uid)) {
           groupUpdate.memberUids = FieldValue.arrayUnion(uid);
           groupUpdate[`members.${uid}`] = { name: profile.name || ghostName, upi: profile.upi || '', avatar: 'av-c' + ((members.length % 8) + 1) };
+          tx.set(db.doc(`groups/${groupId}/activity/join_${uid}`), {
+            type: 'member_joined', actorUid: uid, actorName: profile.name || ghostName,
+            createdAt: FieldValue.serverTimestamp()
+          });
         }
         tx.update(groupRef, groupUpdate);
 

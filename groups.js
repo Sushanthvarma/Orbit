@@ -222,6 +222,17 @@ const OrbitGroups = {
     return onSnapshot(query(collection(_db, 'groups'), where('memberUids', 'array-contains', uid())),
       (snap) => cb(snap.docs.map((d) => d.data())),
       (err) => console.warn('[OrbitGroups] groups listener error', err));
+  },
+  // Live group activity (e.g. "member joined") for the persistent feed.
+  onGroupActivity(groupId, cb) {
+    if (!ensure()) return () => {};
+    return onSnapshot(collection(_db, 'groups', groupId, 'activity'),
+      (snap) => cb(snap.docs.map((d) => {
+        const x = d.data();
+        const ts = (x.createdAt && x.createdAt.toDate) ? x.createdAt.toDate().toISOString() : null;
+        return Object.assign({ id: d.id, _ts: ts }, x);
+      })),
+      (err) => console.warn('[OrbitGroups] activity listener error', err));
   }
 };
 

@@ -88,7 +88,8 @@
       delete: 'Deleted',
       settle: 'Settled',
       import: 'Imported',
-      restore: 'Restored'
+      restore: 'Restored',
+      join: 'Joined'
     })[a] || a;
   }
 
@@ -99,7 +100,8 @@
       delete: '×',
       settle: '✓',
       import: '⇪',
-      restore: '↺'
+      restore: '↺',
+      join: '👋'
     })[a] || '·';
   }
 

@@ -1004,6 +1004,21 @@
       toast('Could not create invite: ' + (e.message || e.code || 'error'), 'neg');
     }
   }
+  // General app invite — share Orbit itself (not a specific group).
+  function inviteToOrbit() {
+    const base = location.origin + location.pathname.replace(/index\.html$/, '');
+    const url = base;
+    const msg = 'I’m using Orbit to split & settle expenses with friends — no more awkward money chats. Try it: ' + url;
+    const body = h('div', {}, [
+      h('p', { class: 'small muted', style: { margin: '0 0 14px' } }, 'Share Orbit with friends and family. They sign in and can start splitting in seconds.'),
+      h('div', { class: 'input', style: { wordBreak: 'break-all', userSelect: 'all', marginBottom: '14px' } }, url)
+    ]);
+    openInfoModal({ title: 'Invite friends to Orbit', body, actions: [
+      { label: 'Copy link', onClick: () => { copyText(url); toast('Link copied'); } },
+      { label: 'WhatsApp', onClick: () => waOpen(msg) },
+      { label: 'Email', onClick: () => { location.href = 'mailto:?subject=' + encodeURIComponent('Try Orbit') + '&body=' + encodeURIComponent(msg); } }
+    ] });
+  }
   function copyText(t) {
     try { navigator.clipboard.writeText(t); } catch (_) {
       const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
@@ -2394,13 +2409,14 @@
     const currency = snap.currency || 'INR';
     const isDelete = entry.action === 'delete';
 
-    return h('div', { class: 'feed-row clickable', onClick: () => openActivityDetail(entry) }, [
+    const isJoin = entry.action === 'join';
+    return h('div', { class: 'feed-row clickable', onClick: () => isJoin ? (entry.groupId && navigate('#/groups/' + entry.groupId)) : openActivityDetail(entry) }, [
       h('div', { class: 'feed-icon', style: {
-        background: isDelete ? 'rgba(251,113,133,0.10)' : 'var(--surface-3)',
-        color: isDelete ? 'var(--neg)' : 'var(--text-2)'
+        background: isJoin ? 'rgba(0,168,126,0.10)' : isDelete ? 'rgba(251,113,133,0.10)' : 'var(--surface-3)',
+        color: isJoin ? 'var(--pos)' : isDelete ? 'var(--neg)' : 'var(--text-2)'
       } }, window.OrbitActivity ? OrbitActivity.actionIcon(entry.action) : '·'),
       h('div', {}, [
-        h('div', { class: 'title' }, [
+        h('div', { class: 'title' }, isJoin ? [h('span', {}, title)] : [
           (window.OrbitActivity ? OrbitActivity.actionLabel(entry.action) : entry.action) + ' · ',
           h('span', { style: isDelete ? { textDecoration: 'line-through', color: 'var(--text-3)' } : {} }, title)
         ]),
@@ -2583,6 +2599,7 @@
     page.appendChild(h('header', { class: 'page-header' }, [
       h('div', { class: 'title-block' }, [h('h1', {}, 'Profile & settings'), h('div', { class: 'sub' }, 'Account, preferences, data')]),
       h('div', { class: 'actions' }, [
+        h('button', { class: 'btn btn-primary btn-sm', onClick: inviteToOrbit }, 'Invite friends'),
         h('button', { class: 'btn btn-ghost btn-sm', onClick: exportAllJson }, 'Export JSON'),
         h('button', { class: 'btn btn-danger btn-sm', onClick: confirmDeleteAll }, 'Wipe all data')
       ])
@@ -3378,6 +3395,7 @@
     });
     body.appendChild(list);
     body.appendChild(h('button', { class: 'btn btn-primary', style: { width: '100%', marginTop: '14px', justifyContent: 'center' }, onClick: () => { closeModal(); openNewGroup(); } }, '+ New group'));
+    body.appendChild(h('button', { class: 'btn', style: { width: '100%', marginTop: '8px', justifyContent: 'center' }, onClick: () => { closeModal(); inviteToOrbit(); } }, 'Invite friends to Orbit'));
     modal.appendChild(body);
     openModal(modal);
   }
@@ -4558,6 +4576,7 @@
   const RealtimeSync = (function () {
     let _groupsUnsub = null;
     const _expenseUnsubs = {};   // groupId -> unsubscribe
+    const _activityUnsubs = {};  // groupId -> unsubscribe (member-joined feed)
     let _started = false;
     let _prevMembers = {};       // groupId -> Set(memberUids) for join detection
 
@@ -4628,6 +4647,24 @@
       });
     }
 
+    // Persistent "X joined" entries for the Activity feed (server-written).
+    function watchGroupActivity(groupId) {
+      if (_activityUnsubs[groupId] || !window.OrbitGroups || !OrbitGroups.onGroupActivity) return;
+      _activityUnsubs[groupId] = OrbitGroups.onGroupActivity(groupId, (items) => {
+        const joins = items.filter((x) => x.type === 'member_joined').map((x) => ({
+          id: groupId + '_' + x.id,
+          actorId: x.actorUid,
+          action: 'join',
+          entityType: 'member',
+          groupId,
+          snapshot: { title: (x.actorName || 'Someone') + ' joined the group' },
+          ts: x._ts || new Date().toISOString(),
+          shared: true
+        }));
+        if (joins.length) { State.activity = mergeById(State.activity, joins); softRerender(); }
+      });
+    }
+
     return {
       start() {
         if (_started) return;
@@ -4661,8 +4698,8 @@
           });
           const tagged = groups.map((g) => normalizeSharedGroup(g));
           State.groups = mergeById(State.groups, tagged);
-          // (Re)subscribe to each shared group's expenses.
-          tagged.forEach((g) => watchGroupExpenses(g.id));
+          // (Re)subscribe to each shared group's expenses + activity feed.
+          tagged.forEach((g) => { watchGroupExpenses(g.id); watchGroupActivity(g.id); });
           softRerender();
         });
       },
@@ -4670,6 +4707,8 @@
         if (_groupsUnsub) { try { _groupsUnsub(); } catch (_) {} _groupsUnsub = null; }
         Object.values(_expenseUnsubs).forEach((u) => { try { u(); } catch (_) {} });
         for (const k in _expenseUnsubs) delete _expenseUnsubs[k];
+        Object.values(_activityUnsubs).forEach((u) => { try { u(); } catch (_) {} });
+        for (const k in _activityUnsubs) delete _activityUnsubs[k];
         _prevMembers = {};
         _started = false;
       }
