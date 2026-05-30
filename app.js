@@ -932,9 +932,15 @@
         h('p', { class: 'small muted', style: { margin: '0 0 14px' } }, 'Anyone who opens this link and signs in joins ' + g.name + '.'),
         h('div', { class: 'input', style: { wordBreak: 'break-all', userSelect: 'all', marginBottom: '14px' } }, url)
       ]);
+      const shareMsg = 'Join our \'' + g.name + '\' group on Orbit to split & settle expenses: ' + url;
       openInfoModal({ title: 'Invite to ' + g.name, body, actions: [
         { label: 'Copy link', onClick: () => { copyText(url); toast('Invite link copied'); } },
-        { label: 'Share on WhatsApp', onClick: () => waOpen('Join our \'' + g.name + '\' group on Orbit to split & settle expenses: ' + url) }
+        { label: 'WhatsApp', onClick: () => waOpen(shareMsg) },
+        { label: 'Email', onClick: () => {
+          const subject = encodeURIComponent('Join “' + g.name + '” on Orbit');
+          const mailBody = encodeURIComponent('Hi,\n\nI\'m using Orbit to split & settle our shared expenses. Tap this link, sign in with Google, and you\'ll join our “' + g.name + '” group:\n\n' + url + '\n\n— sent from Orbit');
+          location.href = 'mailto:?subject=' + subject + '&body=' + mailBody;
+        } }
       ] });
     } catch (e) {
       toast('Could not create invite: ' + (e.message || e.code || 'error'), 'neg');
