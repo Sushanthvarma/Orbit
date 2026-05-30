@@ -3339,6 +3339,16 @@
         if (!userId) { toast('Pick or name a member', 'neg'); return; }
         group.members.push(userId);
         await OrbitDB.put('groups', group);
+        // Shared group + the member has an email/phone → register a claimable
+        // ghost so they auto-link when they sign in (Phase 2 auto-claim).
+        const sid = sharedIdOf(group);
+        if (sid && canShare()) {
+          const m = State.users.find((x) => x.id === userId);
+          if (m && (m.email || m.phone)) {
+            try { await OrbitGroups.addGhostToGroup(sid, { ghostId: userId, name: m.name, email: m.email, phone: m.phone }); }
+            catch (e) { console.warn('[Phase 2] addGhostToGroup failed', e); }
+          }
+        }
         closeModal();
         toast('Added');
         render();
@@ -4192,6 +4202,17 @@
     bindAppOnce();
     route();
     maybeStartRealtime();  // Phase C: begin live shared-group sync
+
+    // Phase 2: claim any pending ghost placeholders invited under my verified
+    // email/phone. The Cloud Function rewrites splits ghost->uid; RealtimeSync
+    // listeners pick up the changes live, so no manual refresh needed.
+    if (window.OrbitGroups && OrbitGroups.isReady()) {
+      OrbitGroups.claimPending().then((r) => {
+        if (r && r.claimed && r.claimed.length) {
+          toast('Linked you into ' + r.claimed.length + ' shared group' + (r.claimed.length > 1 ? 's' : ''), 'pos');
+        }
+      }).catch(() => {});
+    }
 
     if (!cloudOk) {
       toast('Sync unavailable — working offline. Changes save locally.', 'warn');

@@ -170,6 +170,39 @@ const OrbitGroups = {
     return res.data;
   },
 
+  // ---- Identity: ghost members + auto-claim (Phase 2) ----
+  // Add a "ghost" placeholder (a person invited by email/phone who hasn't
+  // signed in yet) to a shared group, and drop a claim ticket addressed to
+  // their handle. When they sign in, claimPending() links them automatically.
+  async addGhostToGroup(groupId, ghost) {
+    if (!ensure() || !uid()) throw new Error('Not signed in');
+    const email = (ghost.email || '').trim().toLowerCase();
+    const phone = (ghost.phone || '').replace(/[^\d+]/g, '');
+    const handle = email || phone;
+    await setDoc(doc(_db, 'groups', groupId), {
+      members: { [ghost.ghostId]: { name: ghost.name || 'Invited', email, phone, ghost: true } }
+    }, { merge: true });
+    if (handle) {
+      await setDoc(doc(_db, 'pendingClaims', handle, 'tickets', ghost.ghostId + '__' + groupId), {
+        groupId, ghostId: ghost.ghostId, name: ghost.name || '', invitedBy: uid(), createdAt: serverTimestamp()
+      });
+    }
+    return handle;
+  },
+  // Claim any pending placeholders for my verified identity. Trusted Cloud
+  // Function does the membership add + split rewrite. Returns { ok, claimed:[groupId] }.
+  async claimPending() {
+    if (!ensure() || !uid()) return { ok: false, claimed: [] };
+    try {
+      const call = httpsCallable(_functions, 'claimPending');
+      const res = await call({});
+      return res.data;
+    } catch (e) {
+      console.warn('[OrbitGroups] claimPending failed', e);
+      return { ok: false, claimed: [], error: e.message || e.code };
+    }
+  },
+
   // ---- Realtime (ready for Phase C wiring) ----
   // Subscribe to live expense changes for an open group. Returns an
   // unsubscribe fn. UI can call this when a group view mounts.

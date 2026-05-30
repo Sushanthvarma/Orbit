@@ -107,3 +107,73 @@ export const leaveGroup = onCall({ region: REGION }, async (request) => {
   });
   return { ok: true };
 });
+
+/**
+ * claimPending() — callable.
+ * Links the caller's VERIFIED identity (Google email / phone-OTP number) to
+ * any pending "ghost" placeholders invited under that handle, across every
+ * group, and rewrites those groups' expense/settlement participant ids
+ * ghost -> uid. It is a pure relabel — amounts are never touched, so balances
+ * are preserved exactly. Idempotent: tickets are deleted as they're claimed.
+ */
+export const claimPending = onCall({ region: REGION }, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const token = request.auth.token || {};
+  const handles = [];
+  if (token.email && token.email_verified) handles.push(String(token.email).toLowerCase());
+  if (token.phone_number) handles.push(String(token.phone_number));
+  if (!handles.length) return { ok: true, claimed: [] };
+
+  const profileSnap = await db.doc(`users/${uid}`).get();
+  const profile = profileSnap.exists ? profileSnap.data() : {};
+  const claimed = [];
+
+  for (const handle of handles) {
+    const tickets = await db.collection(`pendingClaims/${handle}/tickets`).get();
+    for (const t of tickets.docs) {
+      const { groupId, ghostId } = t.data();
+      if (!groupId || !ghostId) { await t.ref.delete().catch(() => {}); continue; }
+      await db.runTransaction(async (tx) => {
+        const groupRef = db.doc(`groups/${groupId}`);
+        const gSnap = await tx.get(groupRef);
+        if (!gSnap.exists) { tx.delete(t.ref); return; }
+        // All reads before any writes (Firestore transaction rule).
+        const expSnap = await tx.get(db.collection(`groups/${groupId}/expenses`));
+        const setSnap = await tx.get(db.collection(`groups/${groupId}/settlements`));
+        const group = gSnap.data();
+        const members = group.memberUids || [];
+        const ghostName = (group.members && group.members[ghostId] && group.members[ghostId].name) || profile.name || 'Member';
+
+        const groupUpdate = { [`members.${ghostId}`]: FieldValue.delete() };
+        if (!members.includes(uid)) {
+          groupUpdate.memberUids = FieldValue.arrayUnion(uid);
+          groupUpdate[`members.${uid}`] = { name: profile.name || ghostName, upi: profile.upi || '', avatar: 'av-c' + ((members.length % 8) + 1) };
+        }
+        tx.update(groupRef, groupUpdate);
+
+        expSnap.forEach((d) => {
+          const e = d.data(); let changed = false;
+          if (e.paidBy === ghostId) { e.paidBy = uid; changed = true; }
+          if (Array.isArray(e.splits)) {
+            e.splits = e.splits.map((s) => (s && s.userId === ghostId ? (changed = true, { ...s, userId: uid }) : s));
+          }
+          if (changed) tx.update(d.ref, { paidBy: e.paidBy, splits: e.splits });
+        });
+        setSnap.forEach((d) => {
+          const s = d.data(); const upd = {};
+          if (s.fromUser === ghostId) upd.fromUser = uid;
+          if (s.toUser === ghostId) upd.toUser = uid;
+          if (s.fromUid === ghostId) upd.fromUid = uid;
+          if (s.toUid === ghostId) upd.toUid = uid;
+          if (Object.keys(upd).length) tx.update(d.ref, upd);
+        });
+
+        tx.set(db.doc(`users/${uid}`), { uid, groupIds: FieldValue.arrayUnion(groupId) }, { merge: true });
+        tx.delete(t.ref);
+      });
+      claimed.push(groupId);
+    }
+  }
+  return { ok: true, claimed };
+});

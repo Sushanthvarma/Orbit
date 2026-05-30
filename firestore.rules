@@ -101,6 +101,23 @@ service cloud.firestore {
       allow update, delete: if signedIn() && resource.data.invitedBy == uid();
     }
 
+    // Pending claim tickets (Phase 2 auto-claim). A ticket is addressed to a
+    // person's email/phone (the {handle} doc id). When that person signs in,
+    // a trusted Cloud Function (claimPending) links their uid and rewrites the
+    // group's splits ghost->uid. A user may READ only tickets addressed to
+    // their OWN verified handle; a group member may CREATE tickets for that
+    // group; only the function (admin) updates/deletes them.
+    match /pendingClaims/{handle}/tickets/{ticketId} {
+      allow read: if signedIn() && (
+        (request.auth.token.email_verified == true && request.auth.token.email == handle) ||
+        (request.auth.token.phone_number == handle)
+      );
+      allow create: if signedIn()
+        && request.resource.data.invitedBy == uid()
+        && isGroupMember(request.resource.data.groupId);
+      allow update, delete: if false;
+    }
+
     // ---- default deny ----
     match /{document=**} {
       allow read, write: if false;
