@@ -1255,10 +1255,20 @@
       if (cat) groups = groups.filter((g) => g.category === cat);
       groups.sort((a, b) => (lastActivityDate(b.id) || '').localeCompare(lastActivityDate(a.id) || ''));
       if (groups.length === 0) {
-        grid.appendChild(h('div', { class: 'empty', style: { gridColumn: '1 / -1' } }, [
-          h('div', { class: 'empty-title' }, 'No groups match'),
-          h('div', { class: 'empty-sub' }, 'Try changing filters or create a new group.')
-        ]));
+        // Distinguish a true first-run (no groups at all) from a filtered-out
+        // result — a new user hasn't "filtered" anything.
+        const noneAtAll = State.groups.length === 0;
+        const empty = h('div', { class: 'empty', style: { gridColumn: '1 / -1' } }, [
+          h('div', { class: 'empty-title' }, noneAtAll ? 'Start your first group' : 'No groups match'),
+          h('div', { class: 'empty-sub' }, noneAtAll
+            ? 'Create a group for your flat, trip, or friends — then add an expense and settle in a tap.'
+            : 'Try changing the search or category filter.')
+        ]);
+        if (noneAtAll) {
+          const cta = h('button', { class: 'btn btn-primary btn-sm', style: { marginTop: '14px' }, onClick: () => openNewGroup() }, '+ New group');
+          empty.appendChild(cta);
+        }
+        grid.appendChild(empty);
         return;
       }
       groups.forEach((g) => grid.appendChild(groupCard(g)));
@@ -1691,7 +1701,8 @@
 
       const tbody = h('tbody');
       if (rows.length === 0) {
-        tbody.appendChild(h('tr', {}, h('td', { colspan: 9, class: 'tbl-empty' }, 'No expenses match your filters.')));
+        tbody.appendChild(h('tr', {}, h('td', { colspan: 9, class: 'tbl-empty' },
+          State.expenses.length === 0 ? 'No expenses yet — tap “Add expense” to log your first.' : 'No expenses match your filters.')));
       }
       rows.forEach((e) => {
         const g = groupById(e.groupId);
