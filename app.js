@@ -578,38 +578,66 @@
     page.appendChild(card);
     setMain(page);
 
-    if (!window.OrbitGroups) {
-      body.appendChild(h('p', { class: 'small muted' }, 'Shared groups are still loading. Refresh and open the link again.'));
+    if (!code) { body.appendChild(h('p', { class: 'small muted' }, 'This invite link is incomplete. Ask the sender to share it again.')); return; }
+    // Remember the code so it survives a sign-in round-trip.
+    try { localStorage.setItem('orbit_pending_join', code); } catch (_) {}
+
+    // Reading/accepting an invite requires being signed in. If not, prompt to
+    // sign in right here (don't show a confusing "not found").
+    const signedIn = window.OrbitCloud && OrbitCloud.user && OrbitCloud.user();
+    if (!signedIn || !window.OrbitGroups || !OrbitGroups.isReady()) {
+      body.innerHTML = '';
+      body.appendChild(h('p', { class: 'small muted', style: { margin: '0 0 16px' } }, 'Sign in to join this group.'));
+      const gbtn = h('button', { class: 'btn btn-primary', style: { marginBottom: '10px' } }, 'Sign in with Google');
+      gbtn.addEventListener('click', async () => {
+        gbtn.disabled = true;
+        try { await OrbitCloud.signInWithGoogle(); } catch (e) { gbtn.disabled = false; toast('Sign-in failed: ' + (e.message || e.code || ''), 'neg'); }
+      });
+      body.appendChild(gbtn);
+      body.appendChild(h('div', { class: 'small muted' }, 'After signing in you’ll come straight back here to join.'));
       return;
     }
-    if (!code) { body.appendChild(h('p', { class: 'small muted' }, 'This invite link is incomplete.')); return; }
 
     body.appendChild(h('div', { class: 'small muted' }, 'Checking your invite…'));
+    let inv = null;
     try {
-      const inv = await OrbitGroups.getInvite(code);
-      if (!inv) { body.innerHTML = ''; body.appendChild(h('p', {}, 'This invite was not found or has expired.')); return; }
-      const g = await OrbitGroups.getGroup(inv.groupId).catch(() => null);
-      body.innerHTML = '';
-      body.appendChild(h('div', { class: 'gc-emoji', style: { margin: '0 auto 12px', width: '48px', height: '48px', fontSize: '22px' } }, (g && g.emoji) || 'OR'));
-      body.appendChild(h('h2', { style: { margin: '0 0 6px' } }, g ? g.name : 'a shared group'));
-      body.appendChild(h('p', { class: 'small muted', style: { margin: '0 0 20px' } }, g ? ((g.memberUids ? g.memberUids.length : 1) + ' members · ' + (g.currency || 'INR')) : 'Tap join to be added.'));
-      const joinBtn = h('button', { class: 'btn btn-primary' }, 'Join this group');
-      joinBtn.addEventListener('click', async () => {
-        joinBtn.disabled = true; joinBtn.textContent = 'Joining…';
-        try {
-          const res = await OrbitGroups.acceptInvite(code);
-          toast('Joined! Welcome to the group.', 'pos');
-          navigate('#/groups/' + (res && res.groupId ? res.groupId : ''));
-        } catch (e) {
-          joinBtn.disabled = false; joinBtn.textContent = 'Join this group';
-          toast('Could not join: ' + (e.message || e.code || 'error'), 'neg');
-        }
-      });
-      body.appendChild(joinBtn);
+      inv = await OrbitGroups.getInvite(code);
     } catch (e) {
       body.innerHTML = '';
-      body.appendChild(h('p', {}, 'Could not load this invite. ' + (e.message || '')));
+      body.appendChild(h('p', {}, 'Couldn’t load this invite — check your connection and try again.'));
+      console.warn('[join] getInvite error', e);
+      return;
     }
+    if (!inv) {
+      body.innerHTML = '';
+      body.appendChild(h('p', { style: { marginBottom: '8px' } }, 'This invite link is not valid anymore.'));
+      body.appendChild(h('p', { class: 'small muted' }, 'Ask the sender to open the group → Invite → and send you a fresh link.'));
+      console.warn('[join] invite not found for code:', code);
+      try { localStorage.removeItem('orbit_pending_join'); } catch (_) {}
+      return;
+    }
+    const g = await OrbitGroups.getGroup(inv.groupId).catch(() => null);
+    body.innerHTML = '';
+    body.appendChild(h('div', { class: 'gc-emoji', style: { margin: '0 auto 12px', width: '48px', height: '48px', fontSize: '22px' } }, (g && g.emoji) || 'OR'));
+    body.appendChild(h('h2', { style: { margin: '0 0 6px' } }, g ? g.name : 'a shared group'));
+    body.appendChild(h('p', { class: 'small muted', style: { margin: '0 0 20px' } }, g ? ((g.memberUids ? g.memberUids.length : 1) + ' members · ' + (g.currency || 'INR')) : 'Tap join to be added.'));
+    const joinBtn = h('button', { class: 'btn btn-primary' }, 'Join this group');
+    joinBtn.addEventListener('click', async () => {
+      joinBtn.disabled = true; joinBtn.textContent = 'Joining…';
+      try {
+        const res = await OrbitGroups.acceptInvite(code);
+        try { localStorage.removeItem('orbit_pending_join'); } catch (_) {}
+        toast('Joined! Welcome to the group.', 'pos');
+        // Pull the newly-shared group so it shows immediately.
+        try { if (typeof RealtimeSync !== 'undefined') RealtimeSync.start(); } catch (_) {}
+        navigate('#/groups/' + (res && res.groupId ? res.groupId : ''));
+      } catch (e) {
+        joinBtn.disabled = false; joinBtn.textContent = 'Join this group';
+        toast('Could not join: ' + (e.message || e.code || 'error'), 'neg');
+        console.warn('[join] acceptInvite error', e);
+      }
+    });
+    body.appendChild(joinBtn);
   }
 
   function viewDashboard() {
@@ -4346,6 +4374,17 @@
       }).catch(() => {});
     }
 
+    // Recover a pending invite the user opened while signed out (the hash can
+    // be lost across the redirect sign-in flow). Send them to the join screen.
+    try {
+      const pj = localStorage.getItem('orbit_pending_join');
+      if (pj) {
+        localStorage.removeItem('orbit_pending_join');
+        if (!/#\/join\//.test(location.hash)) { location.hash = '#/join/' + pj; }
+        else { route(); }
+      }
+    } catch (_) {}
+
     if (!cloudOk) {
       toast('Sync unavailable — working offline. Changes save locally.', 'warn');
     }
@@ -4401,6 +4440,15 @@
   }
 
   async function boot() {
+    // Invite links use ?join=CODE (survives messenger link parsing). Normalize
+    // it into the #/join/CODE route + stash it so it survives sign-in.
+    try {
+      const jc = new URLSearchParams(location.search).get('join');
+      if (jc) {
+        localStorage.setItem('orbit_pending_join', jc);
+        history.replaceState(null, '', location.pathname + '#/join/' + jc);
+      }
+    } catch (_) {}
     // Tag the <html> with device type so CSS + JS can adapt layout/behavior.
     try {
       document.documentElement.classList.toggle('is-mobile', isMobileDevice());
@@ -4452,7 +4500,14 @@
         await OrbitDB.clearAll();
         State.users = []; State.groups = []; State.expenses = []; State.settlements = [];
         const params = new URLSearchParams(location.search);
-        if (params.get('stay') === '1') {
+        // If this is an invite link, DON'T bounce to landing (that drops the
+        // #/join/CODE). Stash the code and show the sign-in gate in place so
+        // the invitee lands on the join screen right after authenticating.
+        const joinMatch = (location.hash || '').match(/#\/join\/([^/?#]+)/);
+        if (joinMatch) {
+          try { localStorage.setItem('orbit_pending_join', joinMatch[1]); } catch (_) {}
+          renderLoginGate({ mode: 'signed-out' });
+        } else if (params.get('stay') === '1') {
           renderLoginGate({ mode: 'signed-out' });
         } else {
           location.replace('./landing.html');

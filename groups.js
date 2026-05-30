@@ -146,8 +146,10 @@ const OrbitGroups = {
       createdAt: serverTimestamp(),
       expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 14 // 14 days
     });
+    // Query-param form survives messenger link parsing better than a #hash.
+    // boot() normalizes ?join=CODE back into the #/join/CODE route.
     const base = location.origin + location.pathname;
-    return { code, url: base + '#/join/' + code };
+    return { code, url: base + '?join=' + code };
   },
   async getInvite(code) {
     if (!ensure()) return null;
