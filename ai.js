@@ -11,7 +11,8 @@
 (function (global) {
   'use strict';
 
-  const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
+  // Use the stable alias, not `-latest`, which Google deprecates without notice.
+  const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
   async function getKey() {
     if (!global.OrbitDB) return null;

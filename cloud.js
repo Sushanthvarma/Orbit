@@ -161,17 +161,29 @@ const OrbitCloud = {
   },
 
   // Mirror a single write. Fire-and-forget (callers shouldn't block on it).
+  // Failures are retried once after a short backoff so a brief network blip
+  // doesn't cause silent divergence between local and cloud state.
   async write(store, obj) {
     if (!_user || !_db) return;
     const keyField = KEY_FIELD[store] || 'id';
     const id = String(obj[keyField]);
     if (!id) return;
-    await setDoc(doc(_db, 'orbit', _user.uid, store, id), obj);
+    try {
+      await setDoc(doc(_db, 'orbit', _user.uid, store, id), obj);
+    } catch (e) {
+      await new Promise((r) => setTimeout(r, 600));
+      await setDoc(doc(_db, 'orbit', _user.uid, store, id), obj);
+    }
   },
 
   async deleteOne(store, id) {
     if (!_user || !_db) return;
-    await deleteDoc(doc(_db, 'orbit', _user.uid, store, String(id)));
+    try {
+      await deleteDoc(doc(_db, 'orbit', _user.uid, store, String(id)));
+    } catch (e) {
+      await new Promise((r) => setTimeout(r, 600));
+      await deleteDoc(doc(_db, 'orbit', _user.uid, store, String(id)));
+    }
   },
 
   async clearStore(store) {

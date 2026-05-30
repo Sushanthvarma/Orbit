@@ -23,7 +23,7 @@
 <style>
 :root{
   --bg:#F6F2EA; --bg-2:#FBF8F1; --card:#FFFFFF;
-  --ink:#0A0A0F; --ink-2:#3A3A45; --ink-3:#6B6F7E; --ink-4:#A0A4B0;
+  --ink:#0A0A0F; --ink-2:#3A3A45; --ink-3:#6B6F7E; --ink-4:#7A7E8B;
   --accent:#6B5BFF; --accent-2:#8A7CFF; --accent-3:#B4A8FF;
   --accent-soft:#EFEBFF; --accent-tint:rgba(107,91,255,.08);
   --pos:#00A87E; --neg:#E5484D; --warn:#F5A623;
@@ -654,22 +654,24 @@ footer{padding:40px 36px;border-top:1px solid var(--line);display:flex;justify-c
 </footer>
 
 <script>
-// ── hero bg canvas ─────────────────────────
+// ── hero bg canvas (static dot grid, redraws only on resize) ─────
 const hbg = document.getElementById('hero-bg');
 const hc = hbg.getContext('2d');
-function resizeHero(){ hbg.width = hbg.offsetWidth; hbg.height = hbg.offsetHeight; }
-resizeHero(); window.addEventListener('resize', resizeHero);
-let t = 0;
-(function loop(){
+function paintHero(){
+  hbg.width = hbg.offsetWidth;
+  hbg.height = hbg.offsetHeight;
   hc.clearRect(0, 0, hbg.width, hbg.height);
-  t += .006;
-  // subtle dots
   hc.fillStyle = 'rgba(107,91,255,.04)';
   for (let x = 24; x < hbg.width; x += 36)
     for (let y = 24; y < hbg.height; y += 36)
       hc.fillRect(x-.7, y-.7, 1.4, 1.4);
-  requestAnimationFrame(loop);
-})();
+}
+paintHero();
+let _heroResizeRaf = 0;
+window.addEventListener('resize', () => {
+  if (_heroResizeRaf) cancelAnimationFrame(_heroResizeRaf);
+  _heroResizeRaf = requestAnimationFrame(paintHero);
+});
 
 // ── reveal on scroll ──────────────────────
 const obs = new IntersectionObserver(e=>{
@@ -677,17 +679,22 @@ const obs = new IntersectionObserver(e=>{
 }, { threshold:.12 });
 document.querySelectorAll('.rv:not(.in)').forEach(el=>obs.observe(el));
 
-// ── scroll parallax for phones ────────────
+// ── scroll parallax for phones (rAF-throttled, passive listener) ─
 const scene = document.querySelector('.scene');
+const _stickers = document.querySelectorAll('.sticker');
+let _scrollY = 0, _scrollPending = false;
+function applyParallax(){
+  _scrollPending = false;
+  _stickers.forEach((s, i) => {
+    const dir = i % 2 === 0 ? 1 : -1;
+    s.style.translate = `0 ${_scrollY * .08 * dir}px`;
+  });
+}
 window.addEventListener('scroll', () => {
   if (!scene) return;
-  const y = window.scrollY;
-  const stickers = document.querySelectorAll('.sticker');
-  stickers.forEach((s, i) => {
-    const dir = i % 2 === 0 ? 1 : -1;
-    s.style.translate = `0 ${y * .08 * dir}px`;
-  });
-});
+  _scrollY = window.scrollY;
+  if (!_scrollPending) { _scrollPending = true; requestAnimationFrame(applyParallax); }
+}, { passive: true });
 
 // ── settle network canvas ─────────────────
 const sc = document.getElementById('settle-canvas');
@@ -828,19 +835,27 @@ if (typewriterEl) {
 <script src="firebase-config.js"></script>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, setPersistence, browserLocalPersistence }
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, setPersistence, browserLocalPersistence }
     from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
 
   const cfg = window.FIREBASE_CONFIG;
   const configured = cfg && cfg.apiKey && !/REPLACE_ME/.test(cfg.apiKey);
   if (!configured) {
     console.warn('Firebase not configured — landing sign-in disabled.');
+    // Disable sign-in CTAs so they don't no-op silently.
+    document.querySelectorAll('.js-signin').forEach((el) => {
+      el.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        alert('Sign-in is not configured for this build. Edit firebase-config.js.');
+      });
+    });
   } else {
     const app = initializeApp(cfg);
     const auth = getAuth(app);
     try { await setPersistence(auth, browserLocalPersistence); } catch (_) {}
 
-    // If already signed in, jump straight to the dashboard.
+    // Pick up Safari/iOS redirect-flow results, then react to auth state.
+    try { await getRedirectResult(auth); } catch (_) {}
     onAuthStateChanged(auth, (u) => {
       if (u) location.replace('./index.html#/dashboard');
     });
@@ -859,7 +874,19 @@ if (typewriterEl) {
           } else {
             el.textContent = 'Opening Google…';
           }
-          await signInWithPopup(auth, provider);
+          try {
+            await signInWithPopup(auth, provider);
+          } catch (err) {
+            const code = err && err.code;
+            if (code === 'auth/popup-blocked'
+              || code === 'auth/popup-closed-by-user'
+              || code === 'auth/operation-not-supported-in-this-environment'
+              || code === 'auth/cancelled-popup-request') {
+              await signInWithRedirect(auth, provider);
+              return;
+            }
+            throw err;
+          }
           // onAuthStateChanged will redirect once auth state settles
         } catch (err) {
           console.error('Sign-in failed', err);

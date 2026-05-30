@@ -87,7 +87,8 @@
     { id: 'e_008', groupId: 'g_flat', title: 'Netflix Premium', amount: 797, currency: 'INR',
       paidBy: 'u_self', splitMode: 'equal',
       splits: equalSplit(797, grp('g_flat').members),
-      category: 'bills', date: D(24, 9, 0), note: 'Recurring — 5th of every month', recurring: true },
+      category: 'bills', date: D(24, 9, 0), note: 'Recurring — 5th of every month',
+      recurring: { freq: 'monthly', anchorDate: D(24, 9, 0), active: true, parentId: null, lastSpawnedAt: null } },
 
     { id: 'e_009', groupId: 'g_flat', title: 'BigBasket groceries', amount: 3640, currency: 'INR',
       paidBy: 'u_rohan', splitMode: 'equal',

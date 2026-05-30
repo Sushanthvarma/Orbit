@@ -48,7 +48,13 @@
         }
       };
 
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        // If another tab tries to upgrade the schema, close our connection so
+        // the upgrade isn't blocked. The page can be refreshed to reconnect.
+        db.onversionchange = () => { try { db.close(); } catch (_) {} _db = null; };
+        resolve(db);
+      };
       req.onerror = () => reject(req.error);
       req.onblocked = () => reject(new Error('IndexedDB blocked. Close other tabs.'));
     });

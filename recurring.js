@@ -61,11 +61,15 @@
     for (const t of templ) {
       if (!t.recurring.active) continue;
       if (!t.recurring.nextDue) {
-        t.recurring.nextDue = addInterval(t.recurring.anchorDate || t.date, t.recurring.freq);
+        const anchor = t.recurring.anchorDate || t.date;
+        const anchorMs = new Date(anchor).getTime();
+        if (!isFinite(anchorMs)) continue; // refuse to corrupt nextDue with NaN
+        t.recurring.nextDue = addInterval(anchor, t.recurring.freq);
         await OrbitDB.put('expenses', t);
         advanced++;
         continue;
       }
+      if (!isFinite(new Date(t.recurring.nextDue).getTime())) continue;
 
       let nextDue = t.recurring.nextDue;
       // Spawn as many clones as are overdue (e.g., if user was offline two months).

@@ -84,7 +84,7 @@
       doc.autoTable({
         startY: y + 8,
         head: [['Person', 'Net', 'Currency']],
-        body: payload.balances.map((b) => [b.otherName, b.amount.toFixed(2), b.currency]),
+        body: payload.balances.map((b) => [b.otherName || '—', Number(b.amount || 0).toFixed(2), b.currency || '']),
         styles: { fontSize: 9, cellPadding: 4 },
         headStyles: { fillColor: [25, 28, 37], textColor: 255 },
         margin: { left: 40, right: 40 }
@@ -161,6 +161,7 @@
     const wb = XLSX.utils.book_new();
 
     // Sheet 1: Summary
+    const balances = payload.balances || [];
     const summary = [
       ['Orbit export'],
       ['Exported at', payload.meta.exportedAt],
@@ -168,7 +169,7 @@
       [],
       ['Balance summary'],
       ['Person', 'Net amount', 'Currency'],
-      ...payload.balances.map((b) => [b.otherName, b.amount, b.currency])
+      ...balances.map((b) => [b.otherName || '—', Number(b.amount || 0), b.currency || ''])
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
 

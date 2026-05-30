@@ -302,6 +302,14 @@
     if (f.to) r = r.filter((e) => e.date <= new Date(f.to + 'T23:59:59').toISOString());
     return r;
   }
+  function greeting() {
+    const h = new Date().getHours();
+    if (h < 5) return 'Up late';
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    if (h < 22) return 'Good evening';
+    return 'Up late';
+  }
   function sortRows(rows, sort, getters) {
     const col = sort.col, dir = sort.dir === 'asc' ? 1 : -1;
     const get = getters[col] || ((x) => x[col]);
@@ -347,8 +355,10 @@
     return { parts, query };
   }
   function navigate(path) {
-    if (location.hash.slice(1) === path) { render(); return; }
-    location.hash = path;
+    // `path` may be "#/x" (from anchor handlers) or "/x" (programmatic).
+    const target = path.startsWith('#') ? path.slice(1) : path;
+    if (location.hash.slice(1) === target) { render(); return; }
+    location.hash = target;
   }
   function route() {
     const { parts, query } = parseHash();
@@ -475,7 +485,7 @@
     const page = h('div', { class: 'page' });
     const head = h('header', { class: 'page-header' }, [
       h('div', { class: 'title-block' }, [
-        h('h1', {}, 'Good evening, ' + (State.users.find((u) => u.id === State.selfId)?.name.split(' ')[0] || 'there')),
+        h('h1', {}, greeting() + ', ' + (State.users.find((u) => u.id === State.selfId)?.name.split(' ')[0] || 'there')),
         h('div', { class: 'sub' }, 'Here\'s where you stand across all groups today.')
       ]),
       h('div', { class: 'actions' }, [
@@ -661,8 +671,15 @@
       '&pn=' + encodeURIComponent(user.name) +
       '&am=' + amount.toFixed(2) +
       '&cu=INR&tn=' + encodeURIComponent('Orbit settle');
+    // Use a hidden anchor click so desktop browsers without a UPI handler
+    // simply do nothing (instead of a "site can't be reached" error page).
+    const a = document.createElement('a');
+    a.href = url;
+    a.rel = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);
     toast('Opening UPI app for ' + fmtMoney(amount, 'INR') + '…');
-    try { window.location.href = url; } catch (_) {}
+    try { a.click(); } finally { document.body.removeChild(a); }
   }
   async function markSettledModal(otherUserId, amount) {
     openConfirmModal({
@@ -1133,7 +1150,7 @@
   }
   async function sendReminder(otherUserId, amount, currency) {
     const otherU = State.users.find((u) => u.id === otherUserId);
-    if (!otherU) return;
+    if (!otherU || otherU.isSelf) return;
     const cache = State.reminderCache || {};
     cache['reminder_' + otherUserId] = new Date().toISOString();
     State.reminderCache = cache;
@@ -1424,7 +1441,8 @@
       ];
       lines.push(row.join(','));
     });
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    // Prepend UTF-8 BOM so Excel on Windows detects encoding correctly.
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'orbit-expenses-' + new Date().toISOString().slice(0,10) + '.csv';
@@ -2216,8 +2234,19 @@
       ])
     ]));
 
-    const me = State.users.find((u) => u.id === State.selfId);
+    let me = State.users.find((u) => u.id === State.selfId);
     const fbUser = (window.OrbitCloud && OrbitCloud.user) ? OrbitCloud.user() : null;
+
+    // Defensive: if we render Profile before ensureSelfUserMatchesAuth has
+    // run (e.g. right after a wipe), synthesize a stub so the page renders.
+    if (!me) {
+      me = {
+        id: State.selfId || 'u_self',
+        name: fbUser?.displayName || 'You',
+        email: fbUser?.email || '',
+        upi: '', phone: '', isSelf: true, avatar: 'av-c1'
+      };
+    }
 
     if (fbUser) {
       const idCard = h('div', { class: 'card', style: { marginBottom: 'var(--s-4)' } });
@@ -2247,12 +2276,12 @@
     cAccBody.appendChild(h('div', { style: { display: 'flex', alignItems: 'center', gap: 'var(--s-4)', marginBottom: 'var(--s-4)' } }, [
       avatar(me.id, 'lg'),
       h('div', {}, [
-        h('div', { style: { fontSize: '15px', fontWeight: 600 } }, me.name),
-        h('div', { class: 'small muted' }, me.email)
+        h('div', { style: { fontSize: '15px', fontWeight: 600 } }, me.name || 'You'),
+        h('div', { class: 'small muted' }, me.email || '—')
       ])
     ]));
-    cAccBody.appendChild(formRow('Display name', h('input', { class: 'input', value: me.name, onChange: async (e) => { me.name = e.target.value.trim(); await OrbitDB.put('users', me); renderMeCard(); toast('Saved'); } })));
-    cAccBody.appendChild(formRow('Email', h('input', { class: 'input', value: me.email, onChange: async (e) => { me.email = e.target.value.trim(); await OrbitDB.put('users', me); toast('Saved'); } })));
+    cAccBody.appendChild(formRow('Display name', h('input', { class: 'input', value: me.name || '', onChange: async (e) => { me.name = e.target.value.trim(); await OrbitDB.put('users', me); renderMeCard(); toast('Saved'); } })));
+    cAccBody.appendChild(formRow('Email', h('input', { class: 'input', value: me.email || '', onChange: async (e) => { me.email = e.target.value.trim(); await OrbitDB.put('users', me); toast('Saved'); } })));
     cAccBody.appendChild(formRow('Phone', h('input', { class: 'input', value: me.phone || '', onChange: async (e) => { me.phone = e.target.value.trim(); await OrbitDB.put('users', me); toast('Saved'); } })));
     cAcc.appendChild(cAccBody);
     grid.appendChild(cAcc);
@@ -2265,10 +2294,7 @@
     cPrefBody.appendChild(formRow('Default currency', selectInput([
       { v: 'INR', l: '₹ INR' }, { v: 'EUR', l: '€ EUR' }, { v: 'USD', l: '$ USD' }, { v: 'GBP', l: '£ GBP' }
     ], 'INR', () => toast('Saved'))));
-    cPrefBody.appendChild(formRow('Theme', h('div', { class: 'seg' }, [
-      h('button', { class: State.theme === 'dark' ? 'active' : '', onClick: () => setTheme('dark') }, 'Dark'),
-      h('button', { class: State.theme === 'light' ? 'active' : '', onClick: () => setTheme('light') }, 'Light'),
-    ])));
+    // Cream-light is the only theme — toggle removed.
     cPref.appendChild(cPrefBody);
     grid.appendChild(cPref);
     page.appendChild(grid);
@@ -2733,6 +2759,56 @@
     root.appendChild(backdrop);
     document.body.style.overflow = 'hidden';
   }
+  function openGeminiKeyModal() {
+    return new Promise((resolve) => {
+      let resolved = false;
+      const input = h('input', {
+        class: 'input mono',
+        type: 'password',
+        placeholder: 'AIzaSy…',
+        autocomplete: 'off',
+        spellcheck: 'false',
+        style: { width: '100%' }
+      });
+      const finish = (v) => { if (resolved) return; resolved = true; closeModal(); resolve(v); };
+      const modal = h('div', { class: 'modal modal-sm' }, [
+        h('div', { class: 'modal-head' }, [
+          h('h2', {}, 'Add your Gemini API key'),
+          h('button', { class: 'close', onClick: () => finish(null) }, '×')
+        ]),
+        h('div', { class: 'modal-body' }, [
+          h('p', { class: 'small muted', style: { margin: '0 0 12px' } },
+            'Orbit uses Google Gemini for natural-language expense parsing. The key is stored only in your browser and synced to your private Firestore — never sent anywhere else.'),
+          h('p', { class: 'small', style: { margin: '0 0 16px' } }, [
+            'Get a free key at ',
+            h('a', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)' } }, 'aistudio.google.com/apikey'),
+            ' — no card required.'
+          ]),
+          input
+        ]),
+        h('div', { class: 'modal-foot' }, [
+          h('button', { class: 'btn btn-ghost btn-sm', onClick: () => finish(null) }, 'Cancel'),
+          h('button', { class: 'btn btn-primary btn-sm', onClick: async () => {
+            const k = input.value.trim();
+            if (!k) { input.focus(); return; }
+            await OrbitAI.setKey(k);
+            finish(k);
+          } }, 'Save key')
+        ])
+      ]);
+      openModal(modal);
+      setTimeout(() => input.focus(), 50);
+      input.addEventListener('keydown', async (ev) => {
+        if (ev.key === 'Enter') {
+          const k = input.value.trim();
+          if (!k) return;
+          await OrbitAI.setKey(k);
+          finish(k);
+        }
+      });
+    });
+  }
+
   function openConfirmModal({ title, bodyHtml, confirmText = 'Confirm', danger = false, onConfirm }) {
     const modal = h('div', { class: 'modal modal-sm confirm-modal' }, [
       h('div', { class: 'modal-head' }, [h('h2', {}, title), h('button', { class: 'close', onClick: closeModal }, '×')]),
@@ -2940,15 +3016,7 @@
     async function ensureKey() {
       const existing = await OrbitAI.getKey();
       if (existing) return existing;
-      const k = window.prompt(
-        'Paste your Google AI Studio (Gemini) API key.\n\n' +
-        'Get one free at https://aistudio.google.com/apikey — no card required.\n\n' +
-        'It is stored only in your browser and Firestore (per-user).',
-        ''
-      );
-      if (!k) return null;
-      await OrbitAI.setKey(k.trim());
-      return k.trim();
+      return await openGeminiKeyModal();
     }
 
     async function runParse() {
@@ -3395,13 +3463,21 @@
       }
     });
     document.addEventListener('keydown', (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      const tag = e.target.tagName;
+      // Don't hijack typing. Buttons/links are excluded too so pressing the
+      // shortcut letter while a button is focused doesn't surprise-navigate.
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+        || tag === 'BUTTON' || tag === 'A' || e.target.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) {
+        if (e.key === 'Escape') closeModal();
+        return;
+      }
       if (e.key === '/') { e.preventDefault(); inp.focus(); inp.select(); }
-      if (e.key === 'n' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); openExpenseModal(); }
-      if (e.key === 'q' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); openAIQuickAdd(); }
-      if (e.key === 'g' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); navigate('#/groups'); }
-      if (e.key === 'd' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); navigate('#/dashboard'); }
-      if (e.key === 'Escape') { closeModal(); }
+      else if (e.key === 'n') { e.preventDefault(); openExpenseModal(); }
+      else if (e.key === 'q') { e.preventDefault(); openAIQuickAdd(); }
+      else if (e.key === 'g') { e.preventDefault(); navigate('#/groups'); }
+      else if (e.key === 'd') { e.preventDefault(); navigate('#/dashboard'); }
+      else if (e.key === 'Escape') { closeModal(); }
     });
   }
 
@@ -3581,7 +3657,8 @@
     $('#newExpenseTop').addEventListener('click', () => openExpenseModal());
     const aiBtn = $('#aiQuickTop');
     if (aiBtn) aiBtn.addEventListener('click', () => openAIQuickAdd());
-    $('#themeToggle').addEventListener('click', () => setTheme(State.theme === 'dark' ? 'light' : 'dark'));
+    const themeBtn = $('#themeToggle');
+    if (themeBtn) themeBtn.addEventListener('click', () => setTheme(State.theme === 'dark' ? 'light' : 'dark'));
     $('#meAvatar').addEventListener('click', () => navigate('#/profile'));
     $('#sidebarNewGroup').addEventListener('click', openNewGroup);
     bindGlobalSearch();

@@ -32,6 +32,25 @@
     catch (_) { return null; }
   }
 
+  // Structural deep-equal that ignores object-key ordering — so a field
+  // re-serialised with a different key order does not appear "changed".
+  function eq(a, b) {
+    if (a === b) return true;
+    if (a == null || b == null) return a === b;
+    if (typeof a !== typeof b) return false;
+    if (typeof a !== 'object') return a === b;
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (!eq(a[i], b[i])) return false;
+      return true;
+    }
+    if (Array.isArray(b)) return false;
+    const ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    for (const k of ka) if (!eq(a[k], b[k])) return false;
+    return true;
+  }
+
   // Field diff between two snapshots — returns array of {field, before, after}.
   function diff(prev, next) {
     if (!prev || !next) return [];
@@ -39,9 +58,7 @@
     const out = [];
     for (const k of fields) {
       if (k === 'id' || k === 'history') continue;
-      const a = prev[k], b = next[k];
-      const same = JSON.stringify(a) === JSON.stringify(b);
-      if (!same) out.push({ field: k, before: a, after: b });
+      if (!eq(prev[k], next[k])) out.push({ field: k, before: prev[k], after: next[k] });
     }
     return out;
   }
