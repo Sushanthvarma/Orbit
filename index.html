@@ -102,6 +102,23 @@
   <script type="module" src="cloud.js?v=4"></script>
   <script src="app.js?v=8"></script>
   <script>
+    // Escape hatch: visiting ?reset=1 unregisters the service worker,
+    // clears all caches, and reloads. Use when a stale SW gets stuck.
+    (async () => {
+      const params = new URLSearchParams(location.search);
+      if (params.get('reset') === '1' && 'serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) await r.unregister();
+        if (window.caches) {
+          const keys = await caches.keys();
+          for (const k of keys) await caches.delete(k);
+        }
+        // Strip the ?reset=1 and reload without it
+        const url = location.pathname + location.hash;
+        location.replace(url);
+        return;
+      }
+    })();
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
     }

@@ -831,6 +831,22 @@ if (typewriterEl) {
 }
 </script>
 
+<!-- Escape hatch: ?reset=1 unregisters SW and clears caches. -->
+<script>
+(async () => {
+  const params = new URLSearchParams(location.search);
+  if (params.get('reset') === '1' && 'serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const r of regs) await r.unregister();
+    if (window.caches) {
+      const keys = await caches.keys();
+      for (const k of keys) await caches.delete(k);
+    }
+    location.replace(location.pathname + location.hash);
+  }
+})();
+</script>
+
 <!-- Firebase sign-in wiring (added for orbit-web integration) -->
 <script src="firebase-config.js"></script>
 <script type="module">
