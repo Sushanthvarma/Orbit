@@ -1629,9 +1629,12 @@
       { v: 'INR', l: '₹ INR' }, { v: 'EUR', l: '€ EUR' }, { v: 'USD', l: '$ USD' }, { v: 'GBP', l: '£ GBP' }
     ], g.currency, async (v) => { g.currency = v; await OrbitDB.put('groups', g); toast('Saved'); })));
     body.appendChild(h('hr'));
-    body.appendChild(h('div', { class: 'btn-row' }, [
-      h('button', { class: 'btn btn-danger btn-sm', onClick: () => deleteGroup(g) }, 'Delete group')
-    ]));
+    // Owner model: the creator owns the group and can delete it; a member who
+    // joined can only LEAVE (the group stays for everyone else).
+    const danger = (isSharedGroup(g) && !isGroupOwner(g))
+      ? h('button', { class: 'btn btn-danger btn-sm', onClick: () => leaveGroupConfirm(g) }, 'Leave group')
+      : h('button', { class: 'btn btn-danger btn-sm', onClick: () => deleteGroup(g) }, 'Delete group');
+    body.appendChild(h('div', { class: 'btn-row' }, [danger]));
     card.appendChild(body);
     return card;
   }
@@ -1646,6 +1649,31 @@
       sel.appendChild(op);
     });
     return sel;
+  }
+  // A joined member leaving a shared group. The creator can't leave (the
+  // server enforces this too) — they delete the group instead. The group and
+  // its expenses stay for everyone else; the leaver can rejoin via an invite.
+  async function leaveGroupConfirm(g) {
+    openConfirmModal({
+      title: 'Leave group?',
+      bodyHtml: `You'll be removed from <strong>${escapeHtml(g.name)}</strong>. The group stays for everyone else, and you can rejoin later from an invite.`,
+      confirmText: 'Leave group',
+      danger: true,
+      onConfirm: async () => {
+        if (!window.OrbitGroups || !OrbitGroups.isReady()) { toast('Sign in to leave this shared group', 'neg'); return; }
+        try {
+          await OrbitGroups.leaveGroup(sharedIdOf(g));
+          State.groups = State.groups.filter((x) => x.id !== g.id);
+          try { await OrbitDB.delete('groups', g.id); } catch (_) {}
+          renderSidebarGroups();
+          toast('You left “' + g.name + '”', 'pos');
+          navigate('#/groups');
+        } catch (e) {
+          toast('Couldn’t leave: ' + (e.message || e.code || 'error'), 'neg');
+          console.warn('[group] leaveGroup failed', e);
+        }
+      }
+    });
   }
   async function deleteGroup(g) {
     openConfirmModal({
