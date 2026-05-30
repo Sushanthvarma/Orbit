@@ -4037,8 +4037,8 @@
 
     const card = h('div', { class: 'login-card' });
 
-    const gateMark = h('span', { class: 'brand-mark', 'aria-hidden': 'true', style: { width: '36px', height: '36px', borderRadius: '11px' } });
-    gateMark.innerHTML = '<svg viewBox="0 0 32 32" fill="none"><g transform="translate(16 16)"><ellipse rx="12" ry="5.6" fill="none" stroke="#fff" stroke-width="1.8" opacity=".82" transform="rotate(-35)"/><ellipse rx="12" ry="5.6" fill="none" stroke="#8A7CFF" stroke-width="1.8" opacity=".8" transform="rotate(35)"/><circle r="3.8" fill="#fff"/></g></svg>';
+    const gateMark = h('span', { class: 'brand-mark', 'aria-hidden': 'true', style: { width: '40px', height: '40px' } });
+    gateMark.innerHTML = '<svg viewBox="0 0 32 32" fill="none"><g transform="translate(16 16)"><ellipse rx="13.5" ry="6.4" fill="none" stroke="#6B5BFF" stroke-width="2.2" transform="rotate(-26)"/><circle r="6" fill="#6B5BFF"/><circle cx="12.1" cy="-5.9" r="2.1" fill="#8A7CFF"/></g></svg>';
     card.appendChild(h('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '12px', marginBottom: '4px' } }, [
       gateMark,
       h('span', { class: 'brand-name', style: { fontSize: '20px' } }, 'Orbit')
