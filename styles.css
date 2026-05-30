@@ -931,20 +931,111 @@ svg.chart .bar.on { fill: url(#bar-grad); }
 .section-title { font-family: var(--font-display); font-size: 13px; font-weight: 600; letter-spacing: -0.005em; text-transform: uppercase; color: var(--text-3); margin: 0 0 8px; }
 
 /* ---------- Responsive (≤ 920px) ---------- */
+/* ---------- Shared-group toggle (Phase D) ---------- */
+.orbit-switch {
+  position: relative; flex-shrink: 0;
+  width: 44px; height: 26px; padding: 0; border: none;
+  border-radius: var(--r-pill); background: var(--line-strong);
+  cursor: pointer; transition: background var(--dur-micro) var(--ease);
+}
+.orbit-switch .orbit-switch-knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: var(--r-pill);
+  background: #fff; box-shadow: var(--sh-1);
+  transition: transform var(--dur-micro) var(--ease);
+}
+.orbit-switch.on { background: var(--accent); }
+.orbit-switch.on .orbit-switch-knob { transform: translateX(18px); }
+.orbit-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.share-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
+  padding: 12px 14px; background: var(--bg-2);
+  border: 1px solid var(--line); border-radius: var(--r-3); cursor: pointer;
+}
+.share-toggle-title { font-size: 13.5px; font-weight: 600; color: var(--text-1); }
+
+/* ---------- Mobile bottom tab bar (glass) — hidden on desktop ---------- */
+.tabbar { display: none; }
+.tab-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; height: 100%; min-height: 48px;
+  color: var(--text-3); text-decoration: none;
+  font-size: 10.5px; font-weight: 600; letter-spacing: -0.01em;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-item svg { width: 22px; height: 22px; }
+.tab-item.active { color: var(--accent); }
+.tab-add {
+  justify-self: center; margin-top: -12px;
+  width: 50px; height: 50px; border: none; border-radius: var(--r-pill);
+  display: inline-flex; align-items: center; justify-content: center; color: #fff;
+  background: linear-gradient(155deg, var(--accent) 0%, #8A7CFF 100%);
+  box-shadow: 0 6px 16px rgba(107,91,255,0.38); cursor: pointer;
+}
+.tab-add svg { width: 24px; height: 24px; }
+.tab-add:active { transform: scale(0.94); }
+
+/* ====================== Responsive: tablet & phone ====================== */
 @media (max-width: 920px) {
   html, body { height: auto; overflow: auto; }
   .app-shell {
+    height: 100dvh;
     grid-template-rows: var(--topbar-h) 1fr;
     grid-template-columns: 1fr;
   }
   .sidebar { display: none; }
-  .topbar { padding: 0 var(--s-4); }
-  .main { padding: var(--s-4); }
+
+  /* Glass tab bar takes over navigation */
+  .tabbar {
+    display: grid; grid-template-columns: repeat(5, 1fr); align-items: center;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    height: calc(58px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: rgba(255,255,255,0.82);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(28px) saturate(180%);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 24px rgba(10,10,15,0.08);
+  }
+
+  /* Topbar: keep brand + actions, drop search/breadcrumbs to save width */
+  .topbar { grid-template-columns: 1fr auto; padding: 0 var(--s-4); }
+  .topbar-center, .crumbs, .brand-divider { display: none; }
+  #newExpenseTop { display: none; }              /* redundant with tab-bar add */
+
+  /* Main scrolls; leave room for the fixed tab bar */
+  .main { padding: var(--s-4) var(--s-4) calc(72px + env(safe-area-inset-bottom)); }
+
+  /* Stack the multi-column layouts */
   .grid-2, .grid-2.content-grid, .input-row, .input-row-3 { grid-template-columns: 1fr; }
   .group-grid { grid-template-columns: 1fr 1fr; }
   .kpi-grid, .kpi-grid.bal-row, .kpi-grid.kpi-grid-3 { grid-template-columns: 1fr; }
   .kpi-orbit { opacity: 0.5; }
-  .modal-foot { padding: 12px 16px 18px; }
+
+  /* Modals become bottom sheets */
+  .modal-backdrop { align-items: flex-end; }
+  .modal, .modal.modal-sm, .modal.modal-md, .modal.modal-lg {
+    width: 100%; max-width: 100%; max-height: 90dvh;
+    border-radius: var(--r-6) var(--r-6) 0 0;
+    animation: sheet-in 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .modal-foot { padding: 12px 16px calc(18px + env(safe-area-inset-bottom)); }
+
+  /* Comfortable touch targets */
+  .btn { min-height: 40px; }
+}
+@keyframes sheet-in { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: none; } }
+
+/* ====================== Responsive: small phones ====================== */
+@media (max-width: 560px) {
+  .group-grid { grid-template-columns: 1fr; }
+  .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr 1fr; }
+  .stat-strip, .trip-kpis { grid-template-columns: repeat(2, 1fr); }
+  .trip-body { grid-template-columns: 1fr; }
+  .owes-row { grid-template-columns: auto 1fr auto; row-gap: 6px; }
+  .owes-row .actions { grid-column: 1 / -1; justify-content: flex-end; }
+  .modal-head { padding: 18px 18px 12px; }
+  .modal-body { padding: 4px 18px 14px; }
 }
 
 /* ============================================================

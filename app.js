@@ -135,6 +135,54 @@
   }
   function groupById(id) { return State.groups.find((g) => g.id === id); }
 
+  // ---- Shared-group helpers (Phase D) -------------------------------
+  // A "shared" group is one that also lives in Firestore (groups.js). To
+  // keep the two paths from forking we make the local group's id EQUAL the
+  // Firestore group id, so realtime echoes merge over the same record and
+  // never produce a duplicate card. sharedIdOf() returns the Firestore id
+  // (or null for a local-only group).
+  function isSharedGroup(g) { return !!(g && (g.shared || g.sharedId)); }
+  function sharedIdOf(g) { return g ? (g.sharedId || (g.shared ? g.id : null)) : null; }
+  function canShare() { return !!(window.OrbitGroups && OrbitGroups.isReady()); }
+
+  // Dual-write an expense to its group's Firestore copy when the group is
+  // shared. Same id as the local record → realtime merge is idempotent.
+  // Best-effort: a cloud failure never blocks the local save.
+  async function syncExpenseIfShared(obj) {
+    const g = groupById(obj.groupId);
+    const sid = sharedIdOf(g);
+    if (!sid || !canShare()) return;
+    try { await OrbitGroups.addExpense(sid, obj); }
+    catch (e) { console.warn('[Phase D] shared expense write failed', e); toast('Saved locally — cloud sync will retry', 'neg'); }
+  }
+  // Mirror a local expense delete to Firestore, else the realtime listener
+  // re-adds the row on next snapshot ("zombie expense").
+  async function syncDeleteExpenseIfShared(e) {
+    const g = groupById(e.groupId);
+    const sid = sharedIdOf(g);
+    if (!sid || !canShare()) return;
+    try { await OrbitGroups.deleteExpense(sid, e.id); }
+    catch (err) { console.warn('[Phase D] shared expense delete failed', err); }
+  }
+  // Convert an existing LOCAL-only group into a shared one. The shared group
+  // already exists in Firestore (sharedId); we re-point the local group and
+  // all its expenses/settlements onto that id so local id === Firestore id
+  // (the invariant the realtime merge relies on) and push history to cloud.
+  async function migrateLocalGroupToShared(g, sharedId) {
+    const oldId = g.id;
+    if (oldId === sharedId) { g.shared = true; g.sharedId = sharedId; await OrbitDB.put('groups', g); return; }
+    const exps = State.expenses.filter((e) => e.groupId === oldId);
+    for (const e of exps) {
+      e.groupId = sharedId;
+      await OrbitDB.put('expenses', e);
+      try { await OrbitGroups.addExpense(sharedId, e); } catch (_) {}
+    }
+    State.settlements.filter((s) => s.groupId === oldId).forEach(async (s) => { s.groupId = sharedId; await OrbitDB.put('settlements', s); });
+    await OrbitDB.delete('groups', oldId);
+    g.id = sharedId; g.shared = true; g.sharedId = sharedId;
+    await OrbitDB.put('groups', g);
+  }
+
   function avatar(userId, size = '') {
     const cls = size ? 'avatar avatar-' + size : 'avatar';
     return h('span', { class: cls, data: { color: String(avatarColor(userId)) } }, userInitial(userId));
@@ -397,10 +445,11 @@
   // SIDEBAR
   // ===================================================================
   function updateSidebarActive() {
-    $$('.nav-item').forEach((n) => n.classList.remove('active'));
+    $$('.nav-item, .tab-item').forEach((n) => n.classList.remove('active'));
     const name = State.route.name;
-    const item = document.querySelector(`.nav-item[data-route="${name}"]`);
-    if (item) item.classList.add('active');
+    // Light up both the desktop sidebar item and the mobile tab-bar item.
+    document.querySelectorAll(`.nav-item[data-route="${name}"], .tab-item[data-route="${name}"]`)
+      .forEach((el) => el.classList.add('active'));
   }
   function renderSidebarGroups() {
     const root = $('#sidebarGroups');
@@ -855,13 +904,18 @@
       return;
     }
     try {
-      // If this group only exists locally, create its shared counterpart first.
-      let sharedId = g.sharedId || g.id;
-      const existing = await OrbitGroups.getGroup(sharedId).catch(() => null);
+      // If this group only exists locally, create its shared counterpart and
+      // migrate the local group + its history onto the shared id.
+      const wasId = g.id;
+      let sharedId = sharedIdOf(g);
+      const existing = sharedId ? await OrbitGroups.getGroup(sharedId).catch(() => null) : null;
       if (!existing) {
         sharedId = await OrbitGroups.createGroup({ name: g.name, currency: g.currency, emoji: g.emoji, category: g.category });
-        g.sharedId = sharedId;
-        try { await OrbitDB.put('groups', g); } catch (_) {}
+        try { await migrateLocalGroupToShared(g, sharedId); } catch (e) { console.warn('[Phase D] group migrate failed', e); g.sharedId = sharedId; }
+      }
+      // The group's id may have changed (migration); keep the route in sync.
+      if (g.id !== wasId && State.route.name === 'groups' && State.route.params && State.route.params.id === wasId) {
+        location.hash = '#/groups/' + g.id;
       }
       const { url } = await OrbitGroups.createInvite(sharedId);
       const body = h('div', {}, [
@@ -1603,7 +1657,9 @@
     openConfirmModal({
       title: 'Delete ' + ids.length + ' expenses?', bodyHtml: 'This cannot be undone.', confirmText: 'Delete all', danger: true,
       onConfirm: async () => {
+        const removing = State.expenses.filter((e) => ids.includes(e.id));
         await OrbitDB.deleteMany('expenses', ids);
+        for (const e of removing) await syncDeleteExpenseIfShared(e);   // Phase D: mirror deletes
         State.expenses = State.expenses.filter((e) => !ids.includes(e.id));
         State.selected.expenses.clear();
         toast(ids.length + ' deleted', 'pos');
@@ -1621,6 +1677,7 @@
           entityId: e.id, groupId: e.groupId, snapshot: null, prev: e
         });
         await OrbitDB.delete('expenses', e.id);
+        await syncDeleteExpenseIfShared(e);   // Phase D: mirror delete to Firestore
         State.expenses = State.expenses.filter((x) => x.id !== e.id);
         toast('Expense deleted', 'pos');
         render();
@@ -3063,7 +3120,7 @@
 
   // ---- New group modal ----
   function openNewGroup() {
-    const data = { name: '', category: 'friends', currency: 'INR', members: [State.selfId], newMember: '' };
+    const data = { name: '', category: 'friends', currency: 'INR', members: [State.selfId], newMember: '', shared: false };
     const modal = h('div', { class: 'modal modal-lg' });
     modal.appendChild(h('div', { class: 'modal-head' }, [h('h2', {}, 'Create a group'), h('button', { class: 'close', onClick: closeModal }, '×')]));
     const body = h('div', { class: 'modal-body' });
@@ -3117,10 +3174,26 @@
     } }, 'Add'));
     body.appendChild(addRow);
 
+    // Shared (multi-user) toggle — only when signed in to the cloud layer.
+    // On, the group is created in Firestore too, so members you invite see
+    // it live on their own devices. Off, it stays on this device only.
+    if (canShare()) {
+      body.appendChild(h('div', { class: 'section-title', style: { marginTop: 'var(--s-4)' } }, 'Sharing'));
+      const sw = orbitSwitch(data.shared, (on) => { data.shared = on; });
+      const row = h('label', { class: 'share-toggle' }, [
+        h('div', {}, [
+          h('div', { class: 'share-toggle-title' }, 'Sync with members'),
+          h('div', { class: 'small muted' }, 'Create a shared group in the cloud so people you invite see it live. Off keeps it on this device.')
+        ]),
+        sw
+      ]);
+      body.appendChild(row);
+    }
+
     modal.appendChild(body);
     modal.appendChild(h('div', { class: 'modal-foot' }, [
       h('button', { class: 'btn btn-ghost btn-sm', onClick: closeModal }, 'Cancel'),
-      h('button', { class: 'btn btn-primary btn-sm', onClick: async () => {
+      h('button', { class: 'btn btn-primary btn-sm', onClick: async (ev) => {
         if (!data.name.trim()) { toast('Name required', 'neg'); return; }
         if (data.members.length < 2) { toast('At least 2 members required', 'neg'); return; }
         const g = {
@@ -3130,15 +3203,44 @@
           emoji: data.name.trim().slice(0, 2).toUpperCase(),
           banner: data.category
         };
+        // Shared: create the Firestore group first and adopt ITS id as the
+        // local id, so the realtime echo merges onto this same record.
+        if (data.shared && canShare()) {
+          const btn = ev.currentTarget; btn.disabled = true; btn.textContent = 'Creating…';
+          try {
+            const sharedId = await OrbitGroups.createGroup({ name: g.name, currency: g.currency, emoji: g.emoji, category: g.category });
+            g.id = sharedId; g.shared = true; g.sharedId = sharedId;
+          } catch (e) {
+            console.warn('[Phase D] shared group create failed', e);
+            toast('Couldn’t create a shared group — saved on this device only', 'neg');
+            g.shared = false; g.sharedId = null;
+          } finally { btn.disabled = false; btn.textContent = 'Create group'; }
+        }
         await OrbitDB.put('groups', g);
         State.groups.push(g);
         closeModal();
         renderSidebarGroups();
-        toast('Group created', 'pos');
+        toast(g.shared ? 'Shared group created' : 'Group created', 'pos');
         navigate('#/groups/' + g.id);
       } }, 'Create group')
     ]));
     openModal(modal);
+  }
+
+  // Minimal token-compliant switch. Returns a button[role=switch]; calls
+  // onChange(bool) on toggle. Iris accent when on, 999 radius.
+  function orbitSwitch(initial, onChange) {
+    let on = !!initial;
+    const btn = h('button', { type: 'button', class: 'orbit-switch' + (on ? ' on' : ''), role: 'switch', 'aria-checked': String(on) }, [
+      h('span', { class: 'orbit-switch-knob' })
+    ]);
+    btn.addEventListener('click', () => {
+      on = !on;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-checked', String(on));
+      onChange(on);
+    });
+    return btn;
   }
 
   function openAddMemberModal(group) {
@@ -3660,6 +3762,7 @@
       await OrbitDB.put('expenses', obj);
       if (existing) State.expenses = State.expenses.map((e) => e.id === obj.id ? obj : e);
       else State.expenses.push(obj);
+      await syncExpenseIfShared(obj);   // Phase D: mirror to Firestore if group is shared
       if (window.OrbitActivity) OrbitActivity.log(OrbitDB, {
         actorId: State.selfId,
         action: existing ? 'edit' : 'add',
@@ -3912,6 +4015,8 @@
     if (_appBound) return;
     _appBound = true;
     $('#newExpenseTop').addEventListener('click', () => openExpenseModal());
+    const tabAdd = $('#tabAdd');
+    if (tabAdd) tabAdd.addEventListener('click', () => openExpenseModal());   // mobile tab-bar add
     const aiBtn = $('#aiQuickTop');
     if (aiBtn) aiBtn.addEventListener('click', () => openAIQuickAdd());
     const themeBtn = $('#themeToggle');
@@ -4127,6 +4232,46 @@
       incoming.forEach((x) => map.set(x.id, x));
       return Array.from(map.values());
     }
+
+    // Firestore groups carry members as an OBJECT map keyed by uid + a
+    // memberUids array. The rest of the app expects members to be an ARRAY
+    // of LOCAL user ids. Normalize here so renderers never see the cloud
+    // shape (otherwise group.members.includes(...) throws). Also ensures a
+    // local user record exists for each member uid.
+    function ensureMemberStub(uidKey, info) {
+      const myUid = (window.OrbitGroups && OrbitGroups.currentUid && OrbitGroups.currentUid()) || null;
+      if (myUid && uidKey === myUid) return State.selfId;     // the signed-in user IS self
+      let u = State.users.find((x) => x.id === uidKey);
+      if (!u) {
+        u = {
+          id: uidKey, name: (info && info.name) || 'Member', isSelf: false,
+          avatar: (info && info.avatar) || ('av-c' + ((State.users.length % 8) + 1)),
+          email: '', upi: (info && info.upi) || '', pending: true
+        };
+        State.users.push(u);
+      }
+      return u.id;
+    }
+    function normalizeSharedGroup(g) {
+      const memberUids = g.memberUids || Object.keys(g.members || {});
+      const membersObj = g.members && !Array.isArray(g.members) ? g.members : {};
+      const cloudMembers = memberUids.map((mu) => ensureMemberStub(mu, membersObj[mu]));
+      const existing = groupById(g.id);
+      // On the creator's device the local group already holds the full
+      // member list they picked; the cloud copy only has people who've
+      // actually joined. Keep whichever is richer so we don't lose members.
+      const members = (existing && Array.isArray(existing.members) && existing.members.length >= cloudMembers.length)
+        ? existing.members : cloudMembers;
+      return Object.assign({}, existing || {}, {
+        id: g.id, name: g.name,
+        currency: g.currency || (existing && existing.currency) || 'INR',
+        emoji: g.emoji || (existing && existing.emoji) || (g.name || '').slice(0, 2).toUpperCase(),
+        category: g.category || (existing && existing.category) || 'friends',
+        banner: (existing && existing.banner) || g.category || 'friends',
+        members, memberCount: memberUids.length,
+        shared: true, sharedId: g.id, createdBy: g.createdBy
+      });
+    }
     function softRerender() {
       // Only re-render if the user is looking at something that shows
       // shared data (dashboard / groups / a group / expenses / settle).
@@ -4156,7 +4301,7 @@
         console.log('[Realtime] starting shared-group listeners');
         // Live list of my shared groups.
         _groupsUnsub = OrbitGroups.onMyGroups((groups) => {
-          const tagged = groups.map((g) => Object.assign({ shared: true }, g));
+          const tagged = groups.map((g) => normalizeSharedGroup(g));
           State.groups = mergeById(State.groups, tagged);
           // (Re)subscribe to each shared group's expenses.
           tagged.forEach((g) => watchGroupExpenses(g.id));
