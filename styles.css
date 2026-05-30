@@ -947,6 +947,13 @@ svg.chart .bar.on { fill: url(#bar-grad); }
 .orbit-switch.on { background: var(--accent); }
 .orbit-switch.on .orbit-switch-knob { transform: translateX(18px); }
 .orbit-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Visible keyboard focus everywhere (WCAG 2.4.7) — purely additive. */
+.btn:focus-visible, .nav-item:focus-visible, .tab-item:focus-visible,
+.avatar-btn:focus-visible, .mini-btn:focus-visible, .close:focus-visible,
+.tab-add:focus-visible, .seg button:focus-visible, .group-card:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
 .share-toggle {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
   padding: 12px 14px; background: var(--bg-2);
