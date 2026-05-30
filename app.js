@@ -134,6 +134,8 @@
     return u ? u.name : 'Unknown';
   }
   function groupById(id) { return State.groups.find((g) => g.id === id); }
+  // Pluralize: plural(1,'person','people') -> "1 person"; plural(3,'group') -> "3 groups".
+  function plural(n, one, many) { return n + ' ' + (Math.abs(n) === 1 ? one : (many || one + 's')); }
 
   // ---- Shared-group helpers (Phase D) -------------------------------
   // A "shared" group is one that also lives in Firestore (groups.js). To
@@ -620,7 +622,7 @@
     body.innerHTML = '';
     body.appendChild(h('div', { class: 'gc-emoji', style: { margin: '0 auto 12px', width: '48px', height: '48px', fontSize: '22px' } }, (g && g.emoji) || 'OR'));
     body.appendChild(h('h2', { style: { margin: '0 0 6px' } }, g ? g.name : 'a shared group'));
-    body.appendChild(h('p', { class: 'small muted', style: { margin: '0 0 20px' } }, g ? ((g.memberUids ? g.memberUids.length : 1) + ' members · ' + (g.currency || 'INR')) : 'Tap join to be added.'));
+    body.appendChild(h('p', { class: 'small muted', style: { margin: '0 0 20px' } }, g ? (plural(g.memberUids ? g.memberUids.length : 1, 'member') + ' · ' + (g.currency || 'INR')) : 'Tap join to be added.'));
     const joinBtn = h('button', { class: 'btn btn-primary' }, 'Join this group');
     joinBtn.addEventListener('click', async () => {
       joinBtn.disabled = true; joinBtn.textContent = 'Joining…';
@@ -665,11 +667,11 @@
     // dark-gradient hero, all three get live 3D mouse-tilt.
     const kpiGrid = h('div', { class: 'kpi-grid bal-row' });
     const netSub = netINR === 0 ? 'You are even' : netINR > 0
-      ? (countCreditors() + ' friends owe you across ' + State.groups.length + ' groups')
-      : 'You owe across ' + countDebtors() + ' people';
+      ? (plural(countCreditors(), 'friend owes', 'friends owe') + ' you across ' + plural(State.groups.length, 'group'))
+      : 'You owe across ' + plural(countDebtors(), 'person', 'people');
     kpiGrid.appendChild(kpiCard('Net position', netINR, 'INR', netSub, '', { hero: true }));
-    kpiGrid.appendChild(kpiCard('You are owed', owed, 'INR', 'Across ' + countCreditors() + ' people', 'pos', { tilt: true }));
-    kpiGrid.appendChild(kpiCard('You owe', -owe, 'INR', 'Across ' + countDebtors() + ' people', 'neg', { tilt: true }));
+    kpiGrid.appendChild(kpiCard('You are owed', owed, 'INR', 'Across ' + plural(countCreditors(), 'person', 'people'), 'pos', { tilt: true }));
+    kpiGrid.appendChild(kpiCard('You owe', -owe, 'INR', 'Across ' + plural(countDebtors(), 'person', 'people'), 'neg', { tilt: true }));
     page.appendChild(kpiGrid);
 
     // Secondary stat row (EUR / groups) — only when there's a foreign balance.
@@ -744,7 +746,7 @@
     const card = h('div', { class: 'card' });
     card.appendChild(h('div', { class: 'card-header' }, [
       h('h3', {}, 'Recent activity'),
-      h('span', { class: 'sub' }, State.expenses.length + ' expenses')
+      h('span', { class: 'sub' }, plural(State.expenses.length, 'expense'))
     ]));
     const sortState = State.sort.dashActivity;
     const sorted = sortRows(State.expenses, sortState, {
@@ -1233,7 +1235,7 @@
     page.appendChild(h('header', { class: 'page-header' }, [
       h('div', { class: 'title-block' }, [
         h('h1', {}, 'Groups'),
-        h('div', { class: 'sub' }, State.groups.length + ' groups · ' + State.expenses.length + ' total expenses')
+        h('div', { class: 'sub' }, plural(State.groups.length, 'group') + ' · ' + plural(State.expenses.length, 'expense') + ' total')
       ]),
       h('div', { class: 'actions' }, [
         h('button', { class: 'btn btn-primary btn-sm', onClick: openNewGroup }, '+ New group')
@@ -1305,7 +1307,7 @@
           h('div', { class: 'gc-name' }, g.name),
           h('div', { class: 'gc-meta' }, [
             h('span', { class: 'cur-pill' }, g.currency),
-            ' · ' + g.members.length + ' members · ' + groupExps.length + ' expenses'
+            ' · ' + plural(g.members.length, 'member') + ' · ' + plural(groupExps.length, 'expense')
           ])
         ])
       ]),
@@ -1347,7 +1349,7 @@
         ]),
         h('div', { class: 'sub', style: { marginTop: '6px' } }, [
           h('span', { class: 'cur-pill' }, g.currency),
-          ' · ' + g.members.length + ' members · created ' + fmtDateShort(g.createdAt)
+          ' · ' + plural(g.members.length, 'member') + ' · created ' + fmtDateShort(g.createdAt)
         ])
       ]),
       h('div', { class: 'actions' }, [
@@ -1937,7 +1939,7 @@
               ? dStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' – ' + dEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
               : 'No expenses yet'),
             h('span', { class: 'trip-meta-dot' }),
-            h('span', { class: 'trip-meta' }, g.members.length + ' members')
+            h('span', { class: 'trip-meta' }, plural(g.members.length, 'member'))
           ])
         ])
       ]),
@@ -2268,7 +2270,7 @@
       const g = groupById(gid);
       tgBody.appendChild(h('div', { class: 'owes-row clickable', onClick: () => navigate('#/groups/' + gid) }, [
         h('div', { class: 'gc-emoji', data: { cat: g?.category }, style: { width: '32px', height: '32px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px', fontWeight: 700, background: groupColor(g) } }, g?.emoji || ''),
-        h('div', {}, [h('div', { class: 'who-name' }, g?.name || ''), h('div', { class: 'who-sub' }, g?.members.length + ' members')]),
+        h('div', {}, [h('div', { class: 'who-name' }, g?.name || ''), h('div', { class: 'who-sub' }, plural((g?.members || []).length, 'member'))]),
         h('div', { class: 'amt' }, fmtMoney(v, cur))
       ]));
     });
@@ -2547,7 +2549,7 @@
       const card = h('div', { class: 'card', style: { marginBottom: 'var(--s-4)' } });
       card.appendChild(h('div', { class: 'card-header' }, [
         h('h3', {}, 'Settlements in ' + cur),
-        h('span', { class: 'sub' }, involve.length + ' transactions')
+        h('span', { class: 'sub' }, plural(involve.length, 'transaction'))
       ]));
       const body = h('div', { class: 'panel-stack' });
       involve.forEach((t) => {
