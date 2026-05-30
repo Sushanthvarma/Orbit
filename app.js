@@ -1615,13 +1615,23 @@
     card.appendChild(body);
     return card;
   }
-  // Remove a member from a group. For a SHARED group the authoritative change
-  // happens server-side (owner-only Cloud Function), which also writes the
-  // "X was removed" activity entry every member's feed picks up via realtime.
+  // Remove a member from a group — always behind a confirmation so nobody is
+  // dropped by an accidental tap on the "×". For a SHARED group the
+  // authoritative change happens server-side (owner-only Cloud Function), which
+  // also writes the "X was removed" activity entry every member's feed picks up.
   // For a device-local group we edit locally and log it ourselves.
-  async function removeMemberFromGroup(g, mid) {
+  function removeMemberFromGroup(g, mid) {
     const u = State.users.find((x) => x.id === mid);
-    const name = u ? u.name : 'member';
+    const name = u ? u.name : 'this member';
+    openConfirmModal({
+      title: 'Remove ' + name + '?',
+      bodyHtml: `<strong>${escapeHtml(name)}</strong> will be removed from <strong>${escapeHtml(g.name)}</strong>. Their past expenses stay, but they lose access to the group. You can add them back later.`,
+      confirmText: 'Remove',
+      danger: true,
+      onConfirm: () => doRemoveMember(g, mid, name)
+    });
+  }
+  async function doRemoveMember(g, mid, name) {
     if (isSharedGroup(g)) {
       if (!window.OrbitGroups || !OrbitGroups.isReady()) { toast('Sign in to manage this shared group', 'neg'); return; }
       try {
