@@ -177,17 +177,20 @@ const OrbitGroups = {
   async addGhostToGroup(groupId, ghost) {
     if (!ensure() || !uid()) throw new Error('Not signed in');
     const email = (ghost.email || '').trim().toLowerCase();
-    const phone = (ghost.phone || '').replace(/[^\d+]/g, '');
-    const handle = email || phone;
+    let phone = (ghost.phone || '').replace(/[^\d+]/g, '');
+    if (phone && !phone.startsWith('+') && phone.length === 10) phone = '+91' + phone;
     await setDoc(doc(_db, 'groups', groupId), {
       members: { [ghost.ghostId]: { name: ghost.name || 'Invited', email, phone, ghost: true } }
     }, { merge: true });
-    if (handle) {
+    // A claim ticket per handle, so the person links whether they sign in via
+    // Google (verified email) or phone-OTP (verified number).
+    const handles = [email, phone].filter(Boolean);
+    for (const handle of handles) {
       await setDoc(doc(_db, 'pendingClaims', handle, 'tickets', ghost.ghostId + '__' + groupId), {
         groupId, ghostId: ghost.ghostId, name: ghost.name || '', invitedBy: uid(), createdAt: serverTimestamp()
       });
     }
-    return handle;
+    return handles[0] || '';
   },
   // Claim any pending placeholders for my verified identity. Trusted Cloud
   // Function does the membership add + split rewrite. Returns { ok, claimed:[groupId] }.

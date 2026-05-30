@@ -157,6 +157,24 @@
   }
   function personHandle(u) { return u ? (normEmail(u.email) || normPhone(u.phone) || '') : ''; }
 
+  // Native phone-contacts picker (Contact Picker API). Android Chrome only,
+  // secure context + user gesture; unsupported on iOS Safari/desktop, so we
+  // feature-detect and only show the button when available.
+  function contactsSupported() { return ('contacts' in navigator) && ('ContactsManager' in window); }
+  async function pickFromContacts() {
+    if (!contactsSupported()) return null;
+    try {
+      const sel = await navigator.contacts.select(['name', 'tel', 'email'], { multiple: false });
+      if (!sel || !sel.length) return null;
+      const c = sel[0];
+      return {
+        name: (c.name && c.name[0]) || '',
+        phone: (c.tel && c.tel[0]) || '',
+        email: (c.email && c.email[0]) || ''
+      };
+    } catch (e) { console.warn('[contacts] pick cancelled/failed', e); return null; }
+  }
+
   // Dual-write an expense to its group's Firestore copy when the group is
   // shared. Same id as the local record → realtime merge is idempotent.
   // Best-effort: a cloud failure never blocks the local save.
@@ -3184,14 +3202,33 @@
     renderMems();
     body.appendChild(memList);
 
-    // Add new member: pick from existing OR by name
-    const addRow = h('div', { style: { display: 'flex', gap: '8px', marginTop: '8px' } });
-    const select = h('select', { class: 'select' });
+    // Add new member: from phone contacts (mobile), an existing person, or by name.
+    // Pick straight from the device address book — captures name + phone/email
+    // so the person can auto-claim their share when they sign in.
+    if (contactsSupported()) {
+      const pickBtn = h('button', { class: 'btn btn-sm', style: { marginTop: '8px', width: '100%', justifyContent: 'center', gap: '8px' } }, [
+        h('span', { html: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><circle cx="12" cy="10" r="2.6"/><path d="M8 17c0-2 1.8-3 4-3s4 1 4 3"/></svg>' }),
+        'Add from contacts'
+      ]);
+      pickBtn.addEventListener('click', async () => {
+        const c = await pickFromContacts();
+        if (!c || !c.name) return;
+        const u = { id: uid('u'), name: c.name, isSelf: false, avatar: 'av-c' + ((State.users.length % 8) + 1), email: normEmail(c.email), phone: normPhone(c.phone), upi: '' };
+        await OrbitDB.put('users', u);
+        State.users.push(u);
+        if (!data.members.includes(u.id)) data.members.push(u.id);
+        renderMems();
+        toast('Added ' + c.name);
+      });
+      body.appendChild(pickBtn);
+    }
+    const addRow = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' } });
+    const select = h('select', { class: 'select', style: { flex: '1 1 140px' } });
     select.appendChild(h('option', { value: '' }, 'Add an existing person…'));
     State.users.filter((u) => !data.members.includes(u.id)).forEach((u) => select.appendChild(h('option', { value: u.id }, u.name)));
     select.addEventListener('change', (e) => { if (e.target.value) { data.members.push(e.target.value); renderMems(); e.target.value=''; } });
     addRow.appendChild(select);
-    const nameInp = h('input', { class: 'input', placeholder: 'or type a new name', style: { flex: '0 0 220px' } });
+    const nameInp = h('input', { class: 'input', placeholder: 'or type a new name', style: { flex: '1 1 140px' } });
     addRow.appendChild(nameInp);
     addRow.appendChild(h('button', { class: 'btn btn-sm', onClick: async () => {
       const nm = nameInp.value.trim();
@@ -3241,6 +3278,16 @@
           try {
             const sharedId = await OrbitGroups.createGroup({ name: g.name, currency: g.currency, emoji: g.emoji, category: g.category });
             g.id = sharedId; g.shared = true; g.sharedId = sharedId;
+            // Register every added member who has an email/phone as a claimable
+            // ghost, so they auto-link to their share when they sign in.
+            for (const mid of data.members) {
+              if (mid === State.selfId) continue;
+              const m = State.users.find((x) => x.id === mid);
+              if (m && (m.email || m.phone)) {
+                try { await OrbitGroups.addGhostToGroup(sharedId, { ghostId: mid, name: m.name, email: m.email, phone: m.phone }); }
+                catch (e) { console.warn('[Phase 2] ghost register failed', e); }
+              }
+            }
           } catch (e) {
             console.warn('[Phase D] shared group create failed', e);
             toast('Couldn’t create a shared group — saved on this device only', 'neg');
@@ -3253,6 +3300,8 @@
         renderSidebarGroups();
         toast(g.shared ? 'Shared group created' : 'Group created', 'pos');
         navigate('#/groups/' + g.id);
+        // Offer to send invite links right after creating a shared group.
+        if (g.shared) setTimeout(() => inviteToGroup(g), 350);
       } }, 'Create group')
     ]));
     openModal(modal);
@@ -3315,11 +3364,28 @@
       sel.addEventListener('change', (e) => { data.picked = e.target.value; });
       body.appendChild(formRow('From contacts', sel));
     }
-    body.appendChild(formRow('Or new person', h('input', { class: 'input', placeholder: 'Name', onInput: (e) => { data.newName = e.target.value; } })));
+    const nameInp = h('input', { class: 'input', placeholder: 'Name', onInput: (e) => { data.newName = e.target.value; } });
+    const emailInp = h('input', { class: 'input', type: 'email', placeholder: 'name@email.com', onInput: (e) => { data.newEmail = e.target.value; } });
+    const phoneInp = h('input', { class: 'input', type: 'tel', placeholder: '+91 98765 43210', onInput: (e) => { data.newPhone = e.target.value; } });
+    // Mobile: pull a person straight from the phone's address book.
+    if (contactsSupported()) {
+      const pickBtn = h('button', { class: 'btn btn-sm', style: { width: '100%', justifyContent: 'center', gap: '8px', marginBottom: '12px' } }, [
+        h('span', { html: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><circle cx="12" cy="10" r="2.6"/><path d="M8 17c0-2 1.8-3 4-3s4 1 4 3"/></svg>' }),
+        'Add from contacts'
+      ]);
+      pickBtn.addEventListener('click', async () => {
+        const c = await pickFromContacts();
+        if (!c) return;
+        data.newName = c.name || ''; data.newEmail = c.email || ''; data.newPhone = c.phone || '';
+        nameInp.value = data.newName; emailInp.value = data.newEmail; phoneInp.value = data.newPhone;
+      });
+      body.appendChild(pickBtn);
+    }
+    body.appendChild(formRow('Or new person', nameInp));
     // Email / phone make this person claimable when they sign in (so the
     // expenses you tag them in become really theirs). Optional but recommended.
-    body.appendChild(formRow('Email (optional)', h('input', { class: 'input', type: 'email', placeholder: 'name@email.com', onInput: (e) => { data.newEmail = e.target.value; } })));
-    body.appendChild(formRow('Phone (optional)', h('input', { class: 'input', type: 'tel', placeholder: '+91 98765 43210', onInput: (e) => { data.newPhone = e.target.value; } })));
+    body.appendChild(formRow('Email (optional)', emailInp));
+    body.appendChild(formRow('Phone (optional)', phoneInp));
     body.appendChild(h('div', { class: 'small muted', style: { marginTop: '-4px' } }, 'Adding an email or phone lets them claim their share when they join Orbit.'));
     modal.appendChild(body);
     modal.appendChild(h('div', { class: 'modal-foot' }, [
@@ -3342,15 +3408,23 @@
         // Shared group + the member has an email/phone → register a claimable
         // ghost so they auto-link when they sign in (Phase 2 auto-claim).
         const sid = sharedIdOf(group);
+        let inviteUrl = null;
         if (sid && canShare()) {
           const m = State.users.find((x) => x.id === userId);
           if (m && (m.email || m.phone)) {
             try { await OrbitGroups.addGhostToGroup(sid, { ghostId: userId, name: m.name, email: m.email, phone: m.phone }); }
             catch (e) { console.warn('[Phase 2] addGhostToGroup failed', e); }
+            // Send the invite straight to them (WhatsApp to their number).
+            if (m.phone) {
+              try {
+                const inv = await OrbitGroups.createInvite(sid); inviteUrl = inv.url;
+                waOpen('Hi ' + (m.name || '') + '! Join our “' + group.name + '” group on Orbit to split & settle our expenses: ' + inv.url, m.phone);
+              } catch (_) {}
+            }
           }
         }
         closeModal();
-        toast('Added');
+        toast(inviteUrl ? 'Added — invite sent' : 'Added');
         render();
       } }, 'Add')
     ]));
