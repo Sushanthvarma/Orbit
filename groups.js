@@ -44,12 +44,15 @@ const OrbitGroups = {
   // ---- Profile (top-level users/{uid}) ----
   async upsertMyProfile(profile) {
     if (!ensure() || !uid()) return;
+    // Normalize handles so owner-side lookups (addExistingUser) match reliably.
+    let phone = (profile.phone || '').replace(/[^\d+]/g, '');
+    if (phone && !phone.startsWith('+') && phone.length === 10) phone = '+91' + phone;
     await setDoc(doc(_db, 'users', uid()), {
       uid: uid(),
       name: profile.name || '',
-      email: profile.email || '',
+      email: (profile.email || '').trim().toLowerCase(),
       upi: profile.upi || '',
-      phone: profile.phone || '',
+      phone,
       photoURL: profile.photoURL || '',
       updatedAt: serverTimestamp()
     }, { merge: true });
@@ -186,6 +189,14 @@ const OrbitGroups = {
     if (!ensure() || !uid()) throw new Error('Not signed in');
     const call = httpsCallable(_functions, 'aiParse');
     const res = await call({ text, ctx: ctx || {} });
+    return res.data;
+  },
+  // Owner-only: if email/phone belongs to an existing Orbit account, add them
+  // straight into the group (no invite). Returns { ok, found, uid?, name? }.
+  async addExistingUser(groupId, { email, phone }) {
+    if (!ensure() || !uid()) throw new Error('Not signed in');
+    const call = httpsCallable(_functions, 'addExistingUser');
+    const res = await call({ groupId, email: email || '', phone: phone || '' });
     return res.data;
   },
 

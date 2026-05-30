@@ -79,12 +79,14 @@
   }
   function fmtDateShort(iso) {
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
     const opts = { month: 'short', day: 'numeric' };
     if (d.getFullYear() !== new Date().getFullYear()) opts.year = '2-digit';
     return d.toLocaleDateString('en-US', opts);
   }
   function fmtDateTime(iso) {
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
   function fmtDateRel(iso) {
@@ -155,12 +157,19 @@
   // - A device-local group has no other accounts — the single user owns it.
   // - A shared group is owned by its creator; members who joined can leave
   //   (self), but cannot remove anyone else.
+  function myUid() {
+    try { const me = window.OrbitCloud && OrbitCloud.user && OrbitCloud.user(); return me ? me.uid : null; }
+    catch (_) { return null; }
+  }
+  // True for "this member is me" — covers both the local self id and the raw
+  // Firebase uid, since shared-group rosters key members by uid.
+  function isSelfMember(id) {
+    return id === State.selfId || (!!myUid() && id === myUid());
+  }
   function isGroupOwner(g) {
     if (!isSharedGroup(g)) return true;
-    try {
-      const me = window.OrbitCloud && OrbitCloud.user && OrbitCloud.user();
-      return !!(me && g.createdBy && g.createdBy === me.uid);
-    } catch (_) { return false; }
+    const mine = myUid();
+    return !!(mine && g.createdBy && g.createdBy === mine);
   }
 
   // ---- Identity handles (foundation for email/phone auto-claim) ----
@@ -979,10 +988,8 @@
   }
   // Invite a friend onto Orbit.
   function inviteViaWhatsApp(user) {
-    const me = State.users.find((u) => u.id === State.selfId);
-    const msg = 'Hey' + (user && user.name ? ' ' + user.name : '') + '! I\'m using Orbit to split & settle expenses. Join me: ' +
-      location.origin + location.pathname + '\n\n— ' + (me ? me.name : 'me');
-    waOpen(msg, user && user.phone);
+    const url = location.origin + location.pathname.replace(/index\.html$/, '');
+    waOpen(orbitAppInviteText(url, user && user.name), user && user.phone);
   }
   // WhatsApp glyph for settle-row buttons.
   function waIcon() {
@@ -990,6 +997,26 @@
     wrap.style.display = 'inline-flex';
     wrap.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.13a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.11.82.83-3.04-.2-.31a8.22 8.22 0 0 1-1.26-4.36c0-4.54 3.7-8.23 8.23-8.23 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.69 8.23-8.23 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.22.25-.86.84-.86 2.05 0 1.21.88 2.38 1 2.54.12.17 1.73 2.64 4.19 3.7.59.25 1.04.4 1.4.52.59.19 1.12.16 1.54.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.28Z"/></svg>';
     return wrap.firstElementChild;
+  }
+  // ── Canonical invite copy ────────────────────────────────────────────
+  // ONE source of truth for every invite message, so a link shared via
+  // WhatsApp, email, copy, or the auto-invite reads identically — same app
+  // name, same tagline, same shape. Never inline an invite string elsewhere.
+  const ORBIT_TAGLINE = 'Money between friends, settled.';
+  function orbitGroupInviteText(groupName, url, toName) {
+    return (toName ? 'Hi ' + toName + ',\n\n' : '') +
+      'You\'re invited to join the “' + groupName + '” group on Orbit — the app to split & settle shared expenses, UPI-ready.\n\n' +
+      'Tap to join (sign in with Google):\n' + url + '\n\n' +
+      '— Orbit · ' + ORBIT_TAGLINE;
+  }
+  function orbitGroupInviteSubject(groupName) {
+    return 'Join “' + groupName + '” on Orbit';
+  }
+  function orbitAppInviteText(url, toName) {
+    return (toName ? 'Hey ' + toName + ',\n\n' : '') +
+      'I\'m using Orbit to split & settle expenses with friends — UPI-ready, no awkward money chats.\n\n' +
+      'Try it:\n' + url + '\n\n' +
+      '— Orbit · ' + ORBIT_TAGLINE;
   }
   // Create a shareable invite for a SHARED (multi-user) group and offer to
   // send it via WhatsApp / copy link. Requires the shared-group layer
@@ -1019,14 +1046,13 @@
         h('p', { class: 'small muted', style: { margin: '0 0 14px' } }, 'Anyone who opens this link and signs in joins ' + g.name + '.'),
         h('div', { class: 'input', style: { wordBreak: 'break-all', userSelect: 'all', marginBottom: '14px' } }, url)
       ]);
-      const shareMsg = 'Join our \'' + g.name + '\' group on Orbit to split & settle expenses: ' + url;
+      const shareMsg = orbitGroupInviteText(g.name, url);
       openInfoModal({ title: 'Invite to ' + g.name, body, actions: [
         { label: 'Copy link', onClick: () => { copyText(url); toast('Invite link copied'); } },
         { label: 'WhatsApp', onClick: () => waOpen(shareMsg) },
         { label: 'Email', onClick: () => {
-          const subject = encodeURIComponent('Join “' + g.name + '” on Orbit');
-          const mailBody = encodeURIComponent('Hi,\n\nI\'m using Orbit to split & settle our shared expenses. Tap this link, sign in with Google, and you\'ll join our “' + g.name + '” group:\n\n' + url + '\n\n— sent from Orbit');
-          location.href = 'mailto:?subject=' + subject + '&body=' + mailBody;
+          location.href = 'mailto:?subject=' + encodeURIComponent(orbitGroupInviteSubject(g.name)) +
+            '&body=' + encodeURIComponent(shareMsg);
         } }
       ] });
     } catch (e) {
@@ -1035,9 +1061,8 @@
   }
   // General app invite — share Orbit itself (not a specific group).
   function inviteToOrbit() {
-    const base = location.origin + location.pathname.replace(/index\.html$/, '');
-    const url = base;
-    const msg = 'I’m using Orbit to split & settle expenses with friends — no more awkward money chats. Try it: ' + url;
+    const url = location.origin + location.pathname.replace(/index\.html$/, '');
+    const msg = orbitAppInviteText(url);
     const body = h('div', {}, [
       h('p', { class: 'small muted', style: { margin: '0 0 14px' } }, 'Share Orbit with friends and family. They sign in and can start splitting in seconds.'),
       h('div', { class: 'input', style: { wordBreak: 'break-all', userSelect: 'all', marginBottom: '14px' } }, url)
@@ -1396,10 +1421,11 @@
       chipRow.appendChild(h('span', { class: 'member-chip' }, [
         avatar(mid, 'sm'),
         u.name,
-        mid !== State.selfId && g.members.length > 2 && isGroupOwner(g) ? h('span', { class: 'x', title: 'Remove', onClick: (e) => { e.stopPropagation(); removeMemberFromGroup(g, mid); } }, '×') : null
+        !isSelfMember(mid) && g.members.length > 2 && isGroupOwner(g) ? h('span', { class: 'x', title: 'Remove', onClick: (e) => { e.stopPropagation(); removeMemberFromGroup(g, mid); } }, '×') : null
       ]));
     });
-    chipRow.appendChild(h('button', { class: 'member-chip', onClick: () => openAddMemberModal(g) }, '+ Add'));
+    // Only the owner manages membership (matches the remove gate above).
+    if (isGroupOwner(g)) chipRow.appendChild(h('button', { class: 'member-chip', onClick: () => openAddMemberModal(g) }, '+ Add'));
     page.appendChild(chipRow);
 
     // Stats strip
@@ -3579,25 +3605,40 @@
         //    only reliable way in. Surface the share flow instead of silently
         //    leaving a dead local-only name.
         const sid = sharedIdOf(group);
-        let inviteUrl = null, needsInvite = false;
+        let inviteUrl = null, needsInvite = false, addedDirectly = false;
         if (sid && canShare()) {
           const m = State.users.find((x) => x.id === userId);
           if (m && (m.email || m.phone)) {
-            try { await OrbitGroups.addGhostToGroup(sid, { ghostId: userId, name: m.name, email: m.email, phone: m.phone }); }
-            catch (e) { console.warn('[Phase 2] addGhostToGroup failed', e); }
-            // Send the invite straight to them (WhatsApp to their number).
-            if (m.phone) {
-              try {
-                const inv = await OrbitGroups.createInvite(sid); inviteUrl = inv.url;
-                waOpen('Hi ' + (m.name || '') + '! Join our “' + group.name + '” group on Orbit to split & settle our expenses: ' + inv.url, m.phone);
-              } catch (_) {}
+            // 1) Already an Orbit user? Add them straight in — no invite needed.
+            try {
+              const res = await OrbitGroups.addExistingUser(sid, { email: m.email, phone: m.phone });
+              if (res && res.found) addedDirectly = true;
+            } catch (e) { console.warn('[add] addExistingUser failed', e); }
+            if (addedDirectly) {
+              // The real uid arrives via realtime; drop the local placeholder so
+              // we don't end up with a duplicate member row.
+              group.members = group.members.filter((x) => x !== userId);
+              await OrbitDB.put('groups', group);
+            } else {
+              // 2) Not on Orbit yet → claimable ghost + invite so they auto-link
+              //    the moment they sign in.
+              try { await OrbitGroups.addGhostToGroup(sid, { ghostId: userId, name: m.name, email: m.email, phone: m.phone }); }
+              catch (e) { console.warn('[Phase 2] addGhostToGroup failed', e); }
+              if (m.phone) {
+                try {
+                  const inv = await OrbitGroups.createInvite(sid); inviteUrl = inv.url;
+                  waOpen(orbitGroupInviteText(group.name, inv.url, m.name), m.phone);
+                } catch (_) {}
+              }
             }
           } else {
             needsInvite = true;
           }
         }
         closeModal();
-        if (needsInvite) {
+        if (addedDirectly) {
+          toast('Added ' + nm + ' — they’re in the group', 'pos');
+        } else if (needsInvite) {
           toast('Add an email or phone to auto-link them — or send this invite', 'warn');
           inviteToGroup(group);   // open the share-link flow so they can actually join
         } else {
@@ -3684,32 +3725,30 @@
       r.start();
     }
 
-    async function ensureKey() {
-      const existing = await OrbitAI.getKey();
-      if (existing) return existing;
-      return await openGeminiKeyModal();
-    }
-
     async function runParse() {
       const text = inp.value.trim();
       if (!text) { status.textContent = 'Describe an expense first.'; return; }
-      const key = await ensureKey();
-      if (!key) { status.textContent = 'API key required to parse.'; return; }
       parseBtn.disabled = true;
       status.innerHTML = '<span style="color: var(--accent)">✦</span> Parsing…';
       try {
         const ctx = {
-          apiKey: key,
           contacts: State.users.map((u) => ({ name: u.name, isSelf: u.isSelf })),
           groups: State.groups.map((g) => ({ name: g.name, currency: g.currency, memberCount: g.members.length })),
           categories: ['food','travel','bills','shop','fun','rent','transport','other']
         };
-        const r = await OrbitAI.parseExpense(text, ctx);
+        // Try the SHARED server key first (no prompt). Only if there's no shared
+        // key AND no personal key do we offer the key modal as a last resort.
+        let r = await OrbitAI.parseExpense(text, ctx);
+        if (!r.ok && r.error === 'needs-key') {
+          const key = await openGeminiKeyModal();
+          if (!key) { status.textContent = 'Quick add isn’t set up yet — ask the group owner, or add your own key.'; parseBtn.disabled = false; return; }
+          r = await OrbitAI.parseExpense(text, Object.assign({ apiKey: key }, ctx));
+        }
         if (!r.ok) {
-          if (r.error === 'needs-key') status.textContent = 'No API key set.';
-          else if (r.error === 'parse') status.textContent = 'AI returned unparseable JSON. Try rephrasing.';
-          else if (r.error?.startsWith('http-')) status.textContent = 'API error: ' + r.error + '. Check your key.';
-          else status.textContent = 'Failed: ' + r.error;
+          if (r.error === 'parse') status.textContent = 'AI returned unparseable JSON. Try rephrasing.';
+          else if (r.error === 'resource-exhausted') status.textContent = 'Daily AI limit reached — try again tomorrow.';
+          else if (r.error && r.error.indexOf('http-') === 0) status.textContent = 'AI service error (' + r.error + ').';
+          else status.textContent = 'Couldn’t parse that — try rephrasing.';
           parseBtn.disabled = false;
           return;
         }
@@ -4721,6 +4760,14 @@
       // actually joined. Keep whichever is richer so we don't lose members.
       const members = (existing && Array.isArray(existing.members) && existing.members.length >= cloudMembers.length)
         ? existing.members : cloudMembers;
+      // Firestore createdAt is a Timestamp object — convert to an ISO string so
+      // the UI's date formatters don't render "Invalid Date".
+      let createdAt = (existing && existing.createdAt) || null;
+      if (g.createdAt) {
+        if (typeof g.createdAt === 'string') createdAt = g.createdAt;
+        else if (typeof g.createdAt.toDate === 'function') createdAt = g.createdAt.toDate().toISOString();
+        else if (g.createdAt.seconds != null) createdAt = new Date(g.createdAt.seconds * 1000).toISOString();
+      }
       return Object.assign({}, existing || {}, {
         id: g.id, name: g.name,
         currency: g.currency || (existing && existing.currency) || 'INR',
@@ -4728,6 +4775,7 @@
         category: g.category || (existing && existing.category) || 'friends',
         banner: (existing && existing.banner) || g.category || 'friends',
         members, memberCount: memberUids.length,
+        createdAt: createdAt || todayISO(),
         shared: true, sharedId: g.id, createdBy: g.createdBy
       });
     }

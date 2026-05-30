@@ -258,6 +258,75 @@ export const claimPending = onCall({ region: REGION }, async (request) => {
   return { ok: true, claimed };
 });
 
+/**
+ * addExistingUser({ groupId, email, phone }) — callable.
+ * Owner-only. If the email/phone belongs to someone who ALREADY has an Orbit
+ * account, add them straight into the group (no invite, no claim ticket) — they
+ * just see the group next time their app syncs. Returns { ok, found, uid?, name? }.
+ * If no existing account matches, returns { ok:true, found:false } so the client
+ * can fall back to the ghost + invite path.
+ */
+export const addExistingUser = onCall({ region: REGION }, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const groupId = request.data && request.data.groupId;
+  if (!groupId) throw new HttpsError('invalid-argument', 'Missing groupId.');
+  const email = (request.data && request.data.email || '').trim().toLowerCase();
+  let phone = (request.data && request.data.phone || '').replace(/[^\d+]/g, '');
+  if (phone && !phone.startsWith('+') && phone.length === 10) phone = '+91' + phone;
+  if (!email && !phone) throw new HttpsError('invalid-argument', 'Need an email or phone.');
+
+  // Caller must own the group.
+  const groupRef = db.doc(`groups/${groupId}`);
+  const gSnap = await groupRef.get();
+  if (!gSnap.exists) throw new HttpsError('not-found', 'Group no longer exists.');
+  if (gSnap.data().createdBy !== uid) {
+    throw new HttpsError('permission-denied', 'Only the group owner can add members.');
+  }
+
+  // Find an existing account by verified handle.
+  let userDoc = null;
+  if (email) {
+    const q = await db.collection('users').where('email', '==', email).limit(1).get();
+    if (!q.empty) userDoc = q.docs[0];
+  }
+  if (!userDoc && phone) {
+    const q = await db.collection('users').where('phone', '==', phone).limit(1).get();
+    if (!q.empty) userDoc = q.docs[0];
+  }
+  if (!userDoc) return { ok: true, found: false };
+
+  const targetUid = userDoc.id;
+  const targetProfile = userDoc.data() || {};
+  const targetName = targetProfile.name || 'Member';
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(groupRef);
+    const group = snap.data();
+    const members = group.memberUids || [];
+    if (members.includes(targetUid)) return; // already in — idempotent
+    tx.update(groupRef, {
+      memberUids: FieldValue.arrayUnion(targetUid),
+      [`members.${targetUid}`]: {
+        name: targetName, upi: targetProfile.upi || '',
+        avatar: 'av-c' + ((members.length % 8) + 1)
+      }
+    });
+    tx.set(db.doc(`groups/${groupId}/activity/join_${targetUid}`), {
+      type: 'member_joined', actorUid: targetUid, actorName: targetName,
+      createdAt: FieldValue.serverTimestamp()
+    });
+    tx.set(db.doc(`adminFeed/j_${groupId}_${targetUid}`), {
+      type: 'join', uid: targetUid, name: targetName,
+      email: targetProfile.email || '', via: 'added-by-owner',
+      groupId, groupName: group.name || '', at: FieldValue.serverTimestamp()
+    });
+    tx.set(db.doc(`users/${targetUid}`), { uid: targetUid, groupIds: FieldValue.arrayUnion(groupId) }, { merge: true });
+  });
+
+  return { ok: true, found: true, uid: targetUid, name: targetName };
+});
+
 /* ============================================================
    aiParse({ text, ctx }) — callable.
    Natural-language → structured expense JSON, using ONE server-held
