@@ -4761,15 +4761,21 @@
       return u.id;
     }
     function normalizeSharedGroup(g) {
-      const memberUids = g.memberUids || Object.keys(g.members || {});
       const membersObj = g.members && !Array.isArray(g.members) ? g.members : {};
-      const cloudMembers = memberUids.map((mu) => ensureMemberStub(mu, membersObj[mu]));
+      const memberUids = g.memberUids || [];
+      // Authoritative roster = EVERYONE the cloud group knows about — both
+      // joined accounts (memberUids) and invited/ghost members (keys of the
+      // members map). Deriving from the cloud, not the local list, means every
+      // device (owner AND each joined member) sees the same complete roster.
+      const cloudIds = Array.from(new Set([...memberUids, ...Object.keys(membersObj)]));
+      const cloudMembers = cloudIds.map((mu) => ensureMemberStub(mu, membersObj[mu]));
       const existing = groupById(g.id);
-      // On the creator's device the local group already holds the full
-      // member list they picked; the cloud copy only has people who've
-      // actually joined. Keep whichever is richer so we don't lose members.
-      const members = (existing && Array.isArray(existing.members) && existing.members.length >= cloudMembers.length)
-        ? existing.members : cloudMembers;
+      // Keep any purely-local members the owner added (e.g. name-only contacts
+      // that never reached the cloud) so their view doesn't lose anyone, but
+      // never drop cloud members from a joined member's view again.
+      const localOnly = (existing && Array.isArray(existing.members))
+        ? existing.members.filter((id) => !cloudMembers.includes(id) && !isSelfMember(id)) : [];
+      const members = [...cloudMembers, ...localOnly];
       // Firestore createdAt is a Timestamp object — convert to an ISO string so
       // the UI's date formatters don't render "Invalid Date".
       let createdAt = (existing && existing.createdAt) || null;
@@ -4784,7 +4790,7 @@
         emoji: g.emoji || (existing && existing.emoji) || (g.name || '').slice(0, 2).toUpperCase(),
         category: g.category || (existing && existing.category) || 'friends',
         banner: (existing && existing.banner) || g.category || 'friends',
-        members, memberCount: memberUids.length,
+        members, memberCount: members.length,
         createdAt: createdAt || todayISO(),
         shared: true, sharedId: g.id, createdBy: g.createdBy
       });
