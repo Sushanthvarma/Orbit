@@ -336,7 +336,7 @@ export const addExistingUser = onCall({ region: REGION }, async (request) => {
    context) so the key can't be repurposed for arbitrary prompts.
    ============================================================ */
 const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 const AI_DAILY_CAP = 50; // per user per UTC day
 
 function buildExpensePrompt(text, ctx) {
