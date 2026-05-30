@@ -123,6 +123,57 @@ export const leaveGroup = onCall({ region: REGION }, async (request) => {
 });
 
 /**
+ * removeMember({ groupId, memberUid }) — callable.
+ * The group creator removes ANOTHER member. Only the creator may do this,
+ * and the creator cannot remove themselves (they delete the group instead).
+ * Idempotent: removing someone already gone is a no-op. Writes a persistent
+ * "X was removed" entry to the group's activity feed so every remaining
+ * member sees it.
+ */
+export const removeMember = onCall({ region: REGION }, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const groupId = request.data && request.data.groupId;
+  const memberUid = request.data && request.data.memberUid;
+  if (!groupId || !memberUid) throw new HttpsError('invalid-argument', 'Missing groupId or memberUid.');
+
+  const groupRef = db.doc(`groups/${groupId}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(groupRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Group no longer exists.');
+    const group = snap.data();
+    if (group.createdBy !== uid) {
+      throw new HttpsError('permission-denied', 'Only the group owner can remove members.');
+    }
+    if (memberUid === uid) {
+      throw new HttpsError('failed-precondition', 'The owner cannot remove themselves; delete the group instead.');
+    }
+    const members = group.memberUids || [];
+    const inRoster = members.includes(memberUid);
+    const inMap = !!(group.members && group.members[memberUid]);
+    if (!inRoster && !inMap) return; // nothing to remove — idempotent
+
+    const removedName = (group.members && group.members[memberUid] && group.members[memberUid].name) || 'A member';
+    const updates = { [`members.${memberUid}`]: FieldValue.delete() };
+    if (inRoster) updates.memberUids = FieldValue.arrayRemove(memberUid);
+    tx.update(groupRef, updates);
+
+    // Persistent "X was removed" entry (deterministic id so a re-remove
+    // never duplicates it).
+    tx.set(db.doc(`groups/${groupId}/activity/remove_${memberUid}`), {
+      type: 'member_removed', actorUid: uid, targetUid: memberUid,
+      targetName: removedName, createdAt: FieldValue.serverTimestamp()
+    });
+    // Drop the group from the removed member's profile index (only real
+    // accounts have a profile; ghosts that never joined don't).
+    if (inRoster) {
+      tx.set(db.doc(`users/${memberUid}`), { groupIds: FieldValue.arrayRemove(groupId) }, { merge: true });
+    }
+  });
+  return { ok: true, groupId, memberUid };
+});
+
+/**
  * claimPending() — callable.
  * Links the caller's VERIFIED identity (Google email / phone-OTP number) to
  * any pending "ghost" placeholders invited under that handle, across every

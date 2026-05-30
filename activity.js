@@ -89,7 +89,8 @@
       settle: 'Settled',
       import: 'Imported',
       restore: 'Restored',
-      join: 'Joined'
+      join: 'Joined',
+      remove: 'Removed'
     })[a] || a;
   }
 
@@ -101,7 +102,8 @@
       settle: '✓',
       import: '⇪',
       restore: '↺',
-      join: '👋'
+      join: '👋',
+      remove: '−'
     })[a] || '·';
   }
 

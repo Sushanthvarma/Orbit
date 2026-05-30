@@ -578,6 +578,25 @@ svg { display: block; }
 .tbl tr:hover td { background: var(--bg-2); }
 .tbl-empty { text-align: center; padding: 32px; color: var(--text-3); }
 
+/* Net-per-member matrix (Balances tab) — reuses .tbl base. The Member column
+   absorbs all slack so the table fills the card; the money columns (Paid /
+   Share / Net) stay a tight, right-aligned cluster with tabular figures. */
+.matrix { table-layout: auto; }
+.matrix th:first-child,
+.matrix td:first-child { width: 100%; color: var(--text-1); font-weight: 500; }
+.matrix th:not(:first-child),
+.matrix td:not(:first-child) {
+  text-align: right; white-space: nowrap;
+  font-variant-numeric: tabular-nums; padding-left: 28px;
+}
+.matrix td:not(:first-child) {
+  font-family: var(--font-display); font-weight: 600;
+  letter-spacing: -0.01em; color: var(--text-1);
+}
+.matrix td.pos { color: var(--pos); }
+.matrix td.neg { color: var(--neg); }
+.matrix td.zero { color: var(--text-3); }
+
 /* ---------- Chips & cats ---------- */
 .chip {
   display: inline-flex; align-items: center; gap: 4px;

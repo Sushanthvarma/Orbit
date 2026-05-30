@@ -171,6 +171,15 @@ const OrbitGroups = {
     const res = await call({ groupId });
     return res.data;
   },
+  // Owner-only: remove ANOTHER member from a shared group. Membership can't
+  // be changed from the client (rules forbid it) — this goes through the
+  // trusted Cloud Function, which also logs the removal to the group feed.
+  async removeMember(groupId, memberUid) {
+    if (!ensure() || !uid()) throw new Error('Not signed in');
+    const call = httpsCallable(_functions, 'removeMember');
+    const res = await call({ groupId, memberUid });
+    return res.data;
+  },
 
   // ---- Identity: ghost members + auto-claim (Phase 2) ----
   // Add a "ghost" placeholder (a person invited by email/phone who hasn't

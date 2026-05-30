@@ -151,6 +151,17 @@
     try { return !!(window.OrbitCloud && OrbitCloud.user && OrbitCloud.user() && OrbitCloud.user().email === 'sushanthvarma@gmail.com'); }
     catch (_) { return false; }
   }
+  // Only the group's owner may manage its membership (remove people).
+  // - A device-local group has no other accounts — the single user owns it.
+  // - A shared group is owned by its creator; members who joined can leave
+  //   (self), but cannot remove anyone else.
+  function isGroupOwner(g) {
+    if (!isSharedGroup(g)) return true;
+    try {
+      const me = window.OrbitCloud && OrbitCloud.user && OrbitCloud.user();
+      return !!(me && g.createdBy && g.createdBy === me.uid);
+    } catch (_) { return false; }
+  }
 
   // ---- Identity handles (foundation for email/phone auto-claim) ----
   // A contact's claimable identity is a normalized email or phone. When that
@@ -624,6 +635,17 @@
       return;
     }
     const g = await OrbitGroups.getGroup(inv.groupId).catch(() => null);
+    // Already a member? Don't ask them to join again — drop them straight into
+    // the group. (Only a member can even read the group doc per the rules, so a
+    // readable group with our uid in memberUids is a reliable "already in" signal.)
+    const myUid = (OrbitGroups.currentUid && OrbitGroups.currentUid()) || (OrbitCloud.user() && OrbitCloud.user().uid) || null;
+    if (g && myUid && Array.isArray(g.memberUids) && g.memberUids.includes(myUid)) {
+      try { localStorage.removeItem('orbit_pending_join'); } catch (_) {}
+      try { if (typeof RealtimeSync !== 'undefined') RealtimeSync.start(); } catch (_) {}
+      toast('You’re already in “' + (g.name || 'this group') + '”.', 'pos');
+      navigate('#/groups/' + inv.groupId);
+      return;
+    }
     body.innerHTML = '';
     body.appendChild(h('div', { class: 'gc-emoji', style: { margin: '0 auto 12px', width: '48px', height: '48px', fontSize: '22px' } }, (g && g.emoji) || 'OR'));
     body.appendChild(h('h2', { style: { margin: '0 0 6px' } }, g ? g.name : 'a shared group'));
@@ -1374,7 +1396,7 @@
       chipRow.appendChild(h('span', { class: 'member-chip' }, [
         avatar(mid, 'sm'),
         u.name,
-        mid !== State.selfId && g.members.length > 2 ? h('span', { class: 'x', title: 'Remove', onClick: async (e) => { e.stopPropagation(); g.members = g.members.filter((x) => x !== mid); await OrbitDB.put('groups', g); render(); toast('Removed ' + u.name); } }, '×') : null
+        mid !== State.selfId && g.members.length > 2 && isGroupOwner(g) ? h('span', { class: 'x', title: 'Remove', onClick: (e) => { e.stopPropagation(); removeMemberFromGroup(g, mid); } }, '×') : null
       ]));
     });
     chipRow.appendChild(h('button', { class: 'member-chip', onClick: () => openAddMemberModal(g) }, '+ Add'));
@@ -1464,7 +1486,7 @@
     const wrap = h('div', { class: 'grid-2' });
     // Matrix
     const card1 = h('div', { class: 'card' }, h('div', { class: 'card-header' }, h('h3', {}, 'Net per member')));
-    const tbl = h('table', { class: 'matrix' });
+    const tbl = h('table', { class: 'tbl matrix' });
     const thead = h('thead'); const tr = h('tr'); tr.appendChild(h('th', {}, 'Member')); tr.appendChild(h('th', {}, 'Paid')); tr.appendChild(h('th', {}, 'Share')); tr.appendChild(h('th', {}, 'Net'));
     thead.appendChild(tr); tbl.appendChild(thead);
     const tbody = h('tbody');
@@ -1566,6 +1588,34 @@
     });
     card.appendChild(body);
     return card;
+  }
+  // Remove a member from a group. For a SHARED group the authoritative change
+  // happens server-side (owner-only Cloud Function), which also writes the
+  // "X was removed" activity entry every member's feed picks up via realtime.
+  // For a device-local group we edit locally and log it ourselves.
+  async function removeMemberFromGroup(g, mid) {
+    const u = State.users.find((x) => x.id === mid);
+    const name = u ? u.name : 'member';
+    if (isSharedGroup(g)) {
+      if (!window.OrbitGroups || !OrbitGroups.isReady()) { toast('Sign in to manage this shared group', 'neg'); return; }
+      try {
+        await OrbitGroups.removeMember(sharedIdOf(g), mid);
+        toast('Removed ' + name, 'pos');
+        // The onMyGroups listener reflects the new roster; no local mutation.
+      } catch (e) {
+        toast('Couldn’t remove ' + name + ': ' + (e.message || e.code || 'error'), 'neg');
+        console.warn('[group] removeMember failed', e);
+      }
+      return;
+    }
+    g.members = g.members.filter((x) => x !== mid);
+    await OrbitDB.put('groups', g);
+    if (window.OrbitActivity) await OrbitActivity.log(OrbitDB, {
+      actorId: State.selfId, action: 'remove', entityType: 'member',
+      entityId: mid, groupId: g.id, snapshot: { title: 'Removed ' + name }
+    });
+    render();
+    toast('Removed ' + name, 'pos');
   }
   function tabSettings(g) {
     const card = h('div', { class: 'card' });
@@ -2416,14 +2466,18 @@
     const currency = snap.currency || 'INR';
     const isDelete = entry.action === 'delete';
 
+    // Member events (join / remove) read as full sentences — render them plainly
+    // (no "Removed · " prefix, no strikethrough) and click through to the group.
+    const isMember = entry.entityType === 'member';
     const isJoin = entry.action === 'join';
-    return h('div', { class: 'feed-row clickable', onClick: () => isJoin ? (entry.groupId && navigate('#/groups/' + entry.groupId)) : openActivityDetail(entry) }, [
+    const isMemberRemove = isMember && entry.action === 'remove';
+    return h('div', { class: 'feed-row clickable', onClick: () => isMember ? (entry.groupId && navigate('#/groups/' + entry.groupId)) : openActivityDetail(entry) }, [
       h('div', { class: 'feed-icon', style: {
-        background: isJoin ? 'rgba(0,168,126,0.10)' : isDelete ? 'rgba(251,113,133,0.10)' : 'var(--surface-3)',
-        color: isJoin ? 'var(--pos)' : isDelete ? 'var(--neg)' : 'var(--text-2)'
+        background: isJoin ? 'rgba(0,168,126,0.10)' : (isMemberRemove || isDelete) ? 'rgba(251,113,133,0.10)' : 'var(--surface-3)',
+        color: isJoin ? 'var(--pos)' : (isMemberRemove || isDelete) ? 'var(--neg)' : 'var(--text-2)'
       } }, window.OrbitActivity ? OrbitActivity.actionIcon(entry.action) : '·'),
       h('div', {}, [
-        h('div', { class: 'title' }, isJoin ? [h('span', {}, title)] : [
+        h('div', { class: 'title' }, isMember ? [h('span', {}, title)] : [
           (window.OrbitActivity ? OrbitActivity.actionLabel(entry.action) : entry.action) + ' · ',
           h('span', { style: isDelete ? { textDecoration: 'line-through', color: 'var(--text-3)' } : {} }, title)
         ]),
@@ -3103,7 +3157,7 @@
   }
   function confirmDeleteAll() {
     openConfirmModal({
-      title: 'Wipe all data?', bodyHtml: 'This permanently deletes every group, expense, and settlement from this device <strong>and the cloud</strong>. There is no undo.', confirmText: 'Wipe everything', danger: true,
+      title: 'Wipe all data?', bodyHtml: 'Clears <strong>your own data</strong> on this device and your account. Shared groups stay with their other members. There is no undo.', confirmText: 'Wipe everything', danger: true,
       onConfirm: async () => {
         await OrbitDB.clearAll();
         await OrbitDB.setMeta('seeded', false);
@@ -3350,6 +3404,9 @@
           try {
             const sharedId = await OrbitGroups.createGroup({ name: g.name, currency: g.currency, emoji: g.emoji, category: g.category });
             g.id = sharedId; g.shared = true; g.sharedId = sharedId;
+            // Stamp the creator locally so ownership (e.g. who can remove
+            // members) is recognised immediately, before the realtime echo.
+            g.createdBy = OrbitGroups.currentUid();
             // Register every added member who has an email/phone as a claimable
             // ghost, so they auto-link to their share when they sign in.
             for (const mid of data.members) {
@@ -4670,7 +4727,18 @@
           ts: x._ts || new Date().toISOString(),
           shared: true
         }));
-        if (joins.length) { State.activity = mergeById(State.activity, joins); softRerender(); }
+        const removals = items.filter((x) => x.type === 'member_removed').map((x) => ({
+          id: groupId + '_' + x.id,
+          actorId: x.actorUid,
+          action: 'remove',
+          entityType: 'member',
+          groupId,
+          snapshot: { title: (x.targetName || 'A member') + ' was removed from the group' },
+          ts: x._ts || new Date().toISOString(),
+          shared: true
+        }));
+        const entries = joins.concat(removals);
+        if (entries.length) { State.activity = mergeById(State.activity, entries); softRerender(); }
       });
     }
 
@@ -4699,6 +4767,13 @@
                 if (!prev.has(mu) && mu !== myUid) {
                   const nm = (g.members && g.members[mu] && g.members[mu].name) || 'Someone';
                   toast(nm + ' joined “' + (g.name || 'the group') + '”', 'pos');
+                }
+              });
+              // Someone in the previous roster is gone — they were removed (or left).
+              prev.forEach((mu) => {
+                if (!now.includes(mu) && mu !== myUid) {
+                  const nm = (g.members && g.members[mu] && g.members[mu].name) || userName(mu) || 'A member';
+                  toast(nm + ' was removed from “' + (g.name || 'the group') + '”', 'neg');
                 }
               });
             }

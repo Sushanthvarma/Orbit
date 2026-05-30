@@ -68,6 +68,8 @@ async function run() {
   // ---- GROUP UPDATE ----
   await check('member (bob) CAN update group (e.g. rename)', () => assertSucceeds(updateDoc(doc(db('bob'), 'groups/g1'), { name: 'Goa Trip 2026' })));
   await check('member CANNOT hijack the createdBy field', () => assertFails(updateDoc(doc(db('bob'), 'groups/g1'), { createdBy: 'bob' })));
+  await check('member CANNOT remove another member from the roster', () => assertFails(updateDoc(doc(db('bob'), 'groups/g1'), { memberUids: ['bob'] })));
+  await check('member CANNOT add someone to the roster from the client', () => assertFails(updateDoc(doc(db('bob'), 'groups/g1'), { memberUids: ['alice', 'bob', 'carol'] })));
   await check('non-member (carol) CANNOT update group', () => assertFails(updateDoc(doc(db('carol'), 'groups/g1'), { name: 'hacked' })));
 
   // ---- GROUP DELETE ----
