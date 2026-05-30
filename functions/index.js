@@ -10,7 +10,6 @@
    Region:  asia-south1 (Mumbai) — closest to India-first users.
    ============================================================ */
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
@@ -18,9 +17,10 @@ initializeApp();
 const db = getFirestore();
 const REGION = 'asia-south1';
 
-// Shared Gemini key so end users never need their own. Set once with:
-//   firebase functions:secrets:set GEMINI_API_KEY
-const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
+// Shared Gemini key so end users never need their own. Provided as a plain
+// env var (no Secret Manager needed) — set it in functions/.env:
+//   GEMINI_API_KEY=your-key-here
+// (functions/.env is gitignored, so the key never lands in the repo.)
 
 /**
  * acceptInvite({ code }) — callable.
@@ -382,13 +382,13 @@ function buildExpensePrompt(text, ctx) {
   ].join('\n');
 }
 
-export const aiParse = onCall({ region: REGION, secrets: [GEMINI_API_KEY] }, async (request) => {
+export const aiParse = onCall({ region: REGION }, async (request) => {
   const uid = request.auth && request.auth.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in to use Quick add.');
   const text = request.data && request.data.text;
   if (!text || !String(text).trim()) throw new HttpsError('invalid-argument', 'Nothing to parse.');
 
-  const key = GEMINI_API_KEY.value();
+  const key = process.env.GEMINI_API_KEY || '';
   if (!key) return { ok: false, error: 'no-server-key' }; // lets the client fall back to a local key
 
   // Soft per-user daily cap (UTC day) to protect the shared key.

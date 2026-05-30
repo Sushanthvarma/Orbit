@@ -4760,6 +4760,34 @@
       }
       return u.id;
     }
+    // Collapse entries that are clearly the SAME person — matched by a single
+    // unique identity: email first, else phone, else name. Keeps one
+    // representative, preferring a real joined account (Firebase uid) or self
+    // over a local/ghost stub. This is what stops the same human (e.g. a
+    // name-added ghost + their joined account) showing up twice.
+    function identityKey(id) {
+      const u = State.users.find((x) => x.id === id);
+      if (!u) return 'id:' + id;
+      const email = (u.email || '').trim().toLowerCase();
+      if (email) return 'e:' + email;
+      const phone = (u.phone || '').replace(/[^\d+]/g, '');
+      if (phone) return 'p:' + phone;
+      return 'n:' + (u.name || '').trim().toLowerCase();
+    }
+    function dedupeMemberIds(ids) {
+      const rank = (id) => isSelfMember(id) ? 3 : (String(id).indexOf('u_') === 0 ? 1 : 2);
+      const best = new Map();   // key -> winning id
+      ids.forEach((id) => {
+        const k = identityKey(id);
+        if (!best.has(k) || rank(id) > rank(best.get(k))) best.set(k, id);
+      });
+      const used = new Set(); const out = [];
+      ids.forEach((id) => {
+        const k = identityKey(id);
+        if (!used.has(k)) { used.add(k); out.push(best.get(k)); }
+      });
+      return out;
+    }
     function normalizeSharedGroup(g) {
       const membersObj = g.members && !Array.isArray(g.members) ? g.members : {};
       const memberUids = g.memberUids || [];
@@ -4775,7 +4803,7 @@
       // never drop cloud members from a joined member's view again.
       const localOnly = (existing && Array.isArray(existing.members))
         ? existing.members.filter((id) => !cloudMembers.includes(id) && !isSelfMember(id)) : [];
-      const members = [...cloudMembers, ...localOnly];
+      const members = dedupeMemberIds([...cloudMembers, ...localOnly]);
       // Firestore createdAt is a Timestamp object — convert to an ISO string so
       // the UI's date formatters don't render "Invalid Date".
       let createdAt = (existing && existing.createdAt) || null;
