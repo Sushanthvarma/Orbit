@@ -4559,6 +4559,7 @@
     let _groupsUnsub = null;
     const _expenseUnsubs = {};   // groupId -> unsubscribe
     let _started = false;
+    let _prevMembers = {};       // groupId -> Set(memberUids) for join detection
 
     function mergeById(arr, incoming) {
       // Replace/insert incoming by id; keep records not in this set.
@@ -4635,6 +4636,22 @@
         console.log('[Realtime] starting shared-group listeners');
         // Live list of my shared groups.
         _groupsUnsub = OrbitGroups.onMyGroups((groups) => {
+          // Notify when a NEW member appears in a group (works for every
+          // existing member — their onMyGroups fires when memberUids grows).
+          const myUid = (window.OrbitGroups && OrbitGroups.currentUid && OrbitGroups.currentUid()) || null;
+          groups.forEach((g) => {
+            const now = g.memberUids || [];
+            const prev = _prevMembers[g.id];
+            if (prev) {
+              now.forEach((mu) => {
+                if (!prev.has(mu) && mu !== myUid) {
+                  const nm = (g.members && g.members[mu] && g.members[mu].name) || 'Someone';
+                  toast(nm + ' joined “' + (g.name || 'the group') + '”', 'pos');
+                }
+              });
+            }
+            _prevMembers[g.id] = new Set(now);
+          });
           const tagged = groups.map((g) => normalizeSharedGroup(g));
           State.groups = mergeById(State.groups, tagged);
           // (Re)subscribe to each shared group's expenses.
@@ -4646,6 +4663,7 @@
         if (_groupsUnsub) { try { _groupsUnsub(); } catch (_) {} _groupsUnsub = null; }
         Object.values(_expenseUnsubs).forEach((u) => { try { u(); } catch (_) {} });
         for (const k in _expenseUnsubs) delete _expenseUnsubs[k];
+        _prevMembers = {};
         _started = false;
       }
     };
