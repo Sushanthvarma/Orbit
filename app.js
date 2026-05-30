@@ -146,6 +146,11 @@
   function isSharedGroup(g) { return !!(g && (g.shared || g.sharedId)); }
   function sharedIdOf(g) { return g ? (g.sharedId || (g.shared ? g.id : null)) : null; }
   function canShare() { return !!(window.OrbitGroups && OrbitGroups.isReady()); }
+  // The app owner — gets a global view of every join across all groups.
+  function isFounder() {
+    try { return !!(window.OrbitCloud && OrbitCloud.user && OrbitCloud.user() && OrbitCloud.user().email === 'sushanthvarma@gmail.com'); }
+    catch (_) { return false; }
+  }
 
   // ---- Identity handles (foundation for email/phone auto-claim) ----
   // A contact's claimable identity is a normalized email or phone. When that
@@ -4579,6 +4584,8 @@
     let _groupsUnsub = null;
     const _expenseUnsubs = {};   // groupId -> unsubscribe
     const _activityUnsubs = {};  // groupId -> unsubscribe (member-joined feed)
+    let _adminUnsub = null;      // founder-only global join feed
+    let _adminSeen = null;
     let _started = false;
     let _prevMembers = {};       // groupId -> Set(memberUids) for join detection
 
@@ -4704,9 +4711,31 @@
           tagged.forEach((g) => { watchGroupExpenses(g.id); watchGroupActivity(g.id); });
           softRerender();
         });
+
+        // Founder: global feed of EVERY join across the whole app.
+        if (isFounder() && OrbitGroups.onAdminFeed) {
+          _adminUnsub = OrbitGroups.onAdminFeed((items) => {
+            const joins = items.filter((x) => x.type === 'join');
+            if (!_adminSeen) {
+              try { _adminSeen = new Set(JSON.parse(localStorage.getItem('orbit_admin_seen') || '[]')); } catch (_) { _adminSeen = new Set(); }
+            }
+            const firstEver = _adminSeen.size === 0 && !localStorage.getItem('orbit_admin_seen');
+            const fresh = joins.filter((x) => !_adminSeen.has(x.id));
+            if (!firstEver) fresh.slice(0, 6).forEach((x) => toast((x.name || 'Someone') + ' joined “' + (x.groupName || 'a group') + '”', 'pos'));
+            joins.forEach((x) => _adminSeen.add(x.id));
+            try { localStorage.setItem('orbit_admin_seen', JSON.stringify([..._adminSeen])); } catch (_) {}
+            const entries = joins.map((x) => ({
+              id: 'admin_' + x.id, actorId: x.uid, action: 'join', entityType: 'member', groupId: x.groupId,
+              snapshot: { title: (x.name || 'Someone') + ' joined ' + (x.groupName || 'a group') + (x.email ? ' · ' + x.email : '') },
+              ts: x._ts || new Date().toISOString(), shared: true
+            }));
+            if (entries.length) { State.activity = mergeById(State.activity, entries); softRerender(); }
+          });
+        }
       },
       stop() {
         if (_groupsUnsub) { try { _groupsUnsub(); } catch (_) {} _groupsUnsub = null; }
+        if (_adminUnsub) { try { _adminUnsub(); } catch (_) {} _adminUnsub = null; }
         Object.values(_expenseUnsubs).forEach((u) => { try { u(); } catch (_) {} });
         for (const k in _expenseUnsubs) delete _expenseUnsubs[k];
         Object.values(_activityUnsubs).forEach((u) => { try { u(); } catch (_) {} });

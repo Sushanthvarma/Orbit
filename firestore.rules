@@ -122,6 +122,13 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Founder-only global activity feed (every join across the whole app).
+    // Written only by trusted Cloud Functions; readable only by the owner.
+    match /adminFeed/{docId} {
+      allow read: if signedIn() && request.auth.token.email == 'sushanthvarma@gmail.com';
+      allow write: if false;
+    }
+
     // ---- default deny ----
     match /{document=**} {
       allow read, write: if false;

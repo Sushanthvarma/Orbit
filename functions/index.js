@@ -69,6 +69,13 @@ export const acceptInvite = onCall({ region: REGION }, async (request) => {
         type: 'member_joined', actorUid: uid, actorName: joinedName,
         createdAt: FieldValue.serverTimestamp()
       });
+      // Founder-only global feed of every join across the app.
+      tx.set(db.doc(`adminFeed/j_${invite.groupId}_${uid}`), {
+        type: 'join', uid, name: joinedName,
+        email: (request.auth.token && request.auth.token.email) || '',
+        via: 'invite', groupId: invite.groupId, groupName: group.name || '',
+        at: FieldValue.serverTimestamp()
+      });
     }
     // Index the group on the user's profile for fast listing.
     tx.set(db.doc(`users/${uid}`), {
@@ -159,6 +166,12 @@ export const claimPending = onCall({ region: REGION }, async (request) => {
           tx.set(db.doc(`groups/${groupId}/activity/join_${uid}`), {
             type: 'member_joined', actorUid: uid, actorName: profile.name || ghostName,
             createdAt: FieldValue.serverTimestamp()
+          });
+          tx.set(db.doc(`adminFeed/j_${groupId}_${uid}`), {
+            type: 'join', uid, name: profile.name || ghostName,
+            email: (request.auth.token && request.auth.token.email) || '',
+            via: 'contact-claim', groupId, groupName: group.name || '',
+            at: FieldValue.serverTimestamp()
           });
         }
         tx.update(groupRef, groupUpdate);

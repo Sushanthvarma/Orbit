@@ -223,6 +223,17 @@ const OrbitGroups = {
       (snap) => cb(snap.docs.map((d) => d.data())),
       (err) => console.warn('[OrbitGroups] groups listener error', err));
   },
+  // Founder-only: live global feed of every join across the app.
+  onAdminFeed(cb) {
+    if (!ensure() || !uid()) return () => {};
+    return onSnapshot(collection(_db, 'adminFeed'),
+      (snap) => cb(snap.docs.map((d) => {
+        const x = d.data();
+        const ts = (x.at && x.at.toDate) ? x.at.toDate().toISOString() : null;
+        return Object.assign({ id: d.id, _ts: ts }, x);
+      })),
+      (err) => console.warn('[OrbitGroups] adminFeed listener error', err));
+  },
   // Live group activity (e.g. "member joined") for the persistent feed.
   onGroupActivity(groupId, cb) {
     if (!ensure()) return () => {};
