@@ -53,8 +53,12 @@ service cloud.firestore {
 
     // A shared group. Membership is the access boundary.
     match /groups/{groupId} {
-      // Read only if you are a member.
-      allow read: if isGroupMember(groupId);
+      // Read only if you are a member. IMPORTANT: use resource.data.memberUids
+      // (the doc being read) — NOT a get() — so the "list my groups" query
+      // (where memberUids array-contains uid) is permitted. A get()-based rule
+      // makes collection queries fail with permission-denied, which is why an
+      // invited member's group never showed up.
+      allow read: if signedIn() && request.auth.uid in resource.data.memberUids;
 
       // Create only if you stamp yourself as creator AND include
       // yourself in the initial member list (no creating groups you
@@ -64,9 +68,9 @@ service cloud.firestore {
         && uid() in request.resource.data.memberUids;
 
       // Existing members may update the group (rename, add members via
-      // the accepted-invite flow, etc.). A member cannot remove the
-      // group's creator field.
-      allow update: if isGroupMember(groupId)
+      // the accepted-invite flow, etc.). A member cannot change the creator.
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.memberUids
         && request.resource.data.createdBy == resource.data.createdBy;
 
       // Only the creator may delete the whole group.

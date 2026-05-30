@@ -4,7 +4,7 @@ import {
   initializeTestEnvironment, assertSucceeds, assertFails
 } from '@firebase/rules-unit-testing';
 import {
-  doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs
+  doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where
 } from 'firebase/firestore';
 import fs from 'fs';
 
@@ -48,6 +48,9 @@ async function run() {
 
   // ---- GROUP READ ----
   await check('member (bob) CAN read group g1', () => assertSucceeds(getDoc(doc(db('bob'), 'groups/g1'))));
+  // The critical "list my groups" query (onMyGroups). This is what was failing.
+  await check('member (bob) CAN list groups he belongs to', () => assertSucceeds(getDocs(query(collection(db('bob'), 'groups'), where('memberUids', 'array-contains', 'bob')))));
+  await check('non-member (carol) CANNOT list a member-scoped query for someone else', () => assertFails(getDocs(query(collection(db('carol'), 'groups'), where('memberUids', 'array-contains', 'bob')))));
   await check('non-member (carol) CANNOT read group g1', () => assertFails(getDoc(doc(db('carol'), 'groups/g1'))));
   await check('signed-out CANNOT read group g1', () => assertFails(getDoc(doc(db(null), 'groups/g1'))));
 
