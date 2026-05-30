@@ -815,6 +815,13 @@
     return uaMobile || (coarse && narrow);
   }
   function isAndroid() { return /Android/i.test(navigator.userAgent || ''); }
+  // Google BLOCKS OAuth inside embedded webviews (WhatsApp / Instagram / FB /
+  // in-app browsers) with "disallowed_useragent". Shared links open there, so
+  // detect it and tell the user to open in a real browser instead.
+  function isInAppBrowser() {
+    const ua = navigator.userAgent || '';
+    return /(FBAN|FBAV|Instagram|WhatsApp|Line\/|Snapchat|Twitter|MicroMessenger|; wv\)|GSA\/)/i.test(ua);
+  }
 
   // Build a spec-compliant UPI intent URL.
   function buildUpiIntent(user, amount) {
@@ -2991,9 +2998,12 @@
   }
   function confirmDeleteAll() {
     openConfirmModal({
-      title: 'Wipe all data?', bodyHtml: 'This permanently deletes every group, expense, and settlement from this browser. There is no undo.', confirmText: 'Wipe everything', danger: true,
+      title: 'Wipe all data?', bodyHtml: 'This permanently deletes every group, expense, and settlement from this device <strong>and the cloud</strong>. There is no undo.', confirmText: 'Wipe everything', danger: true,
       onConfirm: async () => {
         await OrbitDB.clearAll();
+        await OrbitDB.setMeta('seeded', false);
+        // Also clear the cloud copy, else enterApp re-pulls it on next load.
+        try { if (window.OrbitCloud && OrbitCloud.user()) { for (const s of ['users','groups','expenses','settlements','activity','meta']) await OrbitCloud.clearStore(s); } } catch (_) {}
         toast('All data cleared');
         location.reload();
       }
@@ -3904,8 +3914,10 @@
 
     const card = h('div', { class: 'login-card' });
 
+    const gateMark = h('span', { class: 'brand-mark', 'aria-hidden': 'true', style: { width: '36px', height: '36px', borderRadius: '11px' } });
+    gateMark.innerHTML = '<svg viewBox="0 0 32 32" fill="none"><g transform="translate(16 16)"><ellipse rx="12" ry="5.6" fill="none" stroke="#fff" stroke-width="1.8" opacity=".82" transform="rotate(-35)"/><ellipse rx="12" ry="5.6" fill="none" stroke="#8A7CFF" stroke-width="1.8" opacity=".8" transform="rotate(35)"/><circle r="3.8" fill="#fff"/></g></svg>';
     card.appendChild(h('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '12px', marginBottom: '4px' } }, [
-      h('span', { class: 'brand-mark', 'aria-hidden': 'true', style: { width: '36px', height: '36px', borderRadius: '11px' } }),
+      gateMark,
       h('span', { class: 'brand-name', style: { fontSize: '20px' } }, 'Orbit')
     ]));
 
@@ -3932,6 +3944,22 @@
           ' for step-by-step instructions.'
         ])
       ]));
+    } else if (isInAppBrowser()) {
+      // Google refuses OAuth in embedded webviews — don't show a button that
+      // will just fail. Tell them how to get a working browser.
+      card.appendChild(h('div', {
+        style: {
+          background: 'var(--warn-soft)', border: '1px solid rgba(245,166,35,0.30)',
+          borderRadius: '12px', padding: '14px 16px', margin: '6px 0 4px', textAlign: 'left'
+        }
+      }, [
+        h('div', { style: { fontSize: '13.5px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '6px' } }, 'Open in your browser to sign in'),
+        h('div', { style: { fontSize: '12.5px', color: 'var(--text-2)', lineHeight: '1.5' } },
+          'Google sign-in doesn’t work inside in-app browsers (like WhatsApp or Instagram). Tap the ••• menu and choose “Open in Chrome / Safari”, then sign in there.')
+      ]));
+      const copyBtn = h('button', { class: 'btn', style: { marginTop: '12px' } }, 'Copy link');
+      copyBtn.addEventListener('click', () => { copyText(location.href); toast('Link copied — paste it in your browser'); });
+      card.appendChild(copyBtn);
     } else {
       const signInBtn = h('button', { class: 'login-google', id: 'btnGoogleSignIn' }, [
         h('span', { style: { display: 'inline-flex' }, html: googleSvg() }),
@@ -4171,6 +4199,25 @@
     self.photoURL = fbUser.photoURL || self.photoURL || '';
     await OrbitDB.put('users', self);
     await OrbitDB.setMeta('selfUserId', self.id);
+    State.selfId = self.id;
+
+    // Reflect the real signed-in user in the top-bar avatar (was hardcoded "S").
+    try {
+      const av = document.querySelector('#meAvatar .avatar');
+      if (av) {
+        av.textContent = (self.name || 'You').trim().split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase() || 'Y';
+        av.setAttribute('data-color', (self.avatar && self.avatar.startsWith('av-c')) ? self.avatar.slice(4) : '1');
+        av.setAttribute('data-user', self.id);
+      }
+    } catch (_) {}
+
+    // Publish a shared profile so co-members see our real name/UPI instead of
+    // "New member"/"You" in shared groups.
+    try {
+      if (window.OrbitGroups && OrbitGroups.isReady()) {
+        await OrbitGroups.upsertMyProfile({ name: self.name, email: self.email, upi: self.upi, photoURL: self.photoURL });
+      }
+    } catch (e) { console.warn('[Orbit] upsertMyProfile failed', e); }
   }
 
   async function boot() {
