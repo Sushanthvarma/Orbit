@@ -1,5 +1,5 @@
 /* Orbit Web — service worker (offline cache) */
-const CACHE = 'orbit-web-v7';
+const CACHE = 'orbit-web-v8';
 // Only precache assets the page actually requests at the exact URL.
 // JS/CSS are versioned via `?v=` query, so they're fetched live on first
 // load and then cache-first on repeat visits via the fetch handler below.
@@ -32,13 +32,20 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for HTML, cache-first for static assets
-  if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html')) {
+  // Network-first for HTML AND for versioned JS/CSS (anything with `?v=`
+  // in the query string). Cache-first only for static assets like icons.
+  const isHTML = req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html');
+  const isVersionedAsset = url.search.includes('v=');
+
+  if (isHTML || isVersionedAsset) {
     e.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
+          // Only cache successful 2xx responses.
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy));
+          }
           return res;
         })
         .catch(() => caches.match(req).then((r) => r || caches.match('./index.html')))
@@ -46,16 +53,17 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Stale-while-revalidate for everything else (icons, fonts, etc).
   e.respondWith(
     caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
+      const fetchPromise = fetch(req).then((res) => {
         if (res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(req, copy));
         }
         return res;
       }).catch(() => cached);
+      return cached || fetchPromise;
     })
   );
 });
