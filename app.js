@@ -3202,12 +3202,25 @@
     renderMems();
     body.appendChild(memList);
 
-    // Add new member: from phone contacts (mobile), an existing person, or by name.
-    // Pick straight from the device address book — captures name + phone/email
-    // so the person can auto-claim their share when they sign in.
+    // ── Add members — two clean paths, no redundancy ──
+    // 1) "Add from contacts" (mobile): one tap captures name + phone + email,
+    //    so the person can auto-claim their share when they sign in.
+    // 2) A single name field that autocompletes your already-saved contacts
+    //    (datalist) and creates a new one if the name is new.
+    function addMemberById(id) { if (id && !data.members.includes(id)) { data.members.push(id); renderMems(); } }
+    async function addByName(nm) {
+      const v = (nm || '').trim();
+      if (!v) return;
+      const existing = State.users.find((u) => !u.isSelf && u.name.toLowerCase() === v.toLowerCase());
+      if (existing) { addMemberById(existing.id); return; }
+      const u = { id: uid('u'), name: v, isSelf: false, avatar: 'av-c' + ((State.users.length % 8) + 1), email: '', phone: '', upi: '' };
+      await OrbitDB.put('users', u);
+      State.users.push(u);
+      addMemberById(u.id);
+    }
     if (contactsSupported()) {
-      const pickBtn = h('button', { class: 'btn btn-sm', style: { marginTop: '8px', width: '100%', justifyContent: 'center', gap: '8px' } }, [
-        h('span', { html: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><circle cx="12" cy="10" r="2.6"/><path d="M8 17c0-2 1.8-3 4-3s4 1 4 3"/></svg>' }),
+      const pickBtn = h('button', { class: 'btn', style: { marginTop: '8px', width: '100%', justifyContent: 'center', gap: '8px' } }, [
+        h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><circle cx="12" cy="10" r="2.6"/><path d="M8 17c0-2 1.8-3 4-3s4 1 4 3"/></svg>' }),
         'Add from contacts'
       ]);
       pickBtn.addEventListener('click', async () => {
@@ -3216,30 +3229,20 @@
         const u = { id: uid('u'), name: c.name, isSelf: false, avatar: 'av-c' + ((State.users.length % 8) + 1), email: normEmail(c.email), phone: normPhone(c.phone), upi: '' };
         await OrbitDB.put('users', u);
         State.users.push(u);
-        if (!data.members.includes(u.id)) data.members.push(u.id);
-        renderMems();
+        addMemberById(u.id);
         toast('Added ' + c.name);
       });
       body.appendChild(pickBtn);
     }
-    const addRow = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' } });
-    const select = h('select', { class: 'select', style: { flex: '1 1 140px' } });
-    select.appendChild(h('option', { value: '' }, 'Add an existing person…'));
-    State.users.filter((u) => !data.members.includes(u.id)).forEach((u) => select.appendChild(h('option', { value: u.id }, u.name)));
-    select.addEventListener('change', (e) => { if (e.target.value) { data.members.push(e.target.value); renderMems(); e.target.value=''; } });
-    addRow.appendChild(select);
-    const nameInp = h('input', { class: 'input', placeholder: 'or type a new name', style: { flex: '1 1 140px' } });
+    const dlId = 'ng-saved-contacts';
+    const dl = h('datalist', { id: dlId });
+    State.users.filter((u) => !u.isSelf).forEach((u) => dl.appendChild(h('option', { value: u.name })));
+    body.appendChild(dl);
+    const addRow = h('div', { style: { display: 'flex', gap: '8px', marginTop: '8px' } });
+    const nameInp = h('input', { class: 'input', list: dlId, placeholder: contactsSupported() ? 'or add by name' : 'Add by name', style: { flex: '1 1 auto', minWidth: 0 } });
+    nameInp.addEventListener('keydown', async (e) => { if (e.key === 'Enter') { e.preventDefault(); await addByName(nameInp.value); nameInp.value = ''; } });
     addRow.appendChild(nameInp);
-    addRow.appendChild(h('button', { class: 'btn btn-sm', onClick: async () => {
-      const nm = nameInp.value.trim();
-      if (!nm) return;
-      const u = { id: uid('u'), name: nm, isSelf: false, avatar: 'av-c' + ((State.users.length % 8) + 1), email: '', upi: '' };
-      await OrbitDB.put('users', u);
-      State.users.push(u);
-      data.members.push(u.id);
-      nameInp.value = '';
-      renderMems();
-    } }, 'Add'));
+    addRow.appendChild(h('button', { class: 'btn btn-sm', style: { flexShrink: 0 }, onClick: async () => { await addByName(nameInp.value); nameInp.value = ''; } }, 'Add'));
     body.appendChild(addRow);
 
     // Shared (multi-user) toggle — only when signed in to the cloud layer.
@@ -3356,15 +3359,12 @@
       h('div', { class: 'modal-head' }, [h('h2', {}, 'Add member'), h('button', { class: 'close', onClick: closeModal }, '×')])
     ]);
     const body = h('div', { class: 'modal-body' });
-    const others = State.users.filter((u) => !group.members.includes(u.id));
-    if (others.length) {
-      const sel = h('select', { class: 'select' });
-      sel.appendChild(h('option', { value: '' }, 'Choose existing person…'));
-      others.forEach((u) => sel.appendChild(h('option', { value: u.id }, u.name)));
-      sel.addEventListener('change', (e) => { data.picked = e.target.value; });
-      body.appendChild(formRow('From contacts', sel));
-    }
-    const nameInp = h('input', { class: 'input', placeholder: 'Name', onInput: (e) => { data.newName = e.target.value; } });
+    // Saved contacts autocomplete in the name field (no separate dropdown).
+    const dlId = 'am-saved-contacts';
+    const dl = h('datalist', { id: dlId });
+    State.users.filter((u) => !u.isSelf && !group.members.includes(u.id)).forEach((u) => dl.appendChild(h('option', { value: u.name })));
+    body.appendChild(dl);
+    const nameInp = h('input', { class: 'input', list: dlId, placeholder: 'Name', onInput: (e) => { data.newName = e.target.value; } });
     const emailInp = h('input', { class: 'input', type: 'email', placeholder: 'name@email.com', onInput: (e) => { data.newEmail = e.target.value; } });
     const phoneInp = h('input', { class: 'input', type: 'tel', placeholder: '+91 98765 43210', onInput: (e) => { data.newPhone = e.target.value; } });
     // Mobile: pull a person straight from the phone's address book.
@@ -3391,10 +3391,22 @@
     modal.appendChild(h('div', { class: 'modal-foot' }, [
       h('button', { class: 'btn btn-ghost btn-sm', onClick: closeModal }, 'Cancel'),
       h('button', { class: 'btn btn-primary btn-sm', onClick: async () => {
-        let userId = data.picked;
-        if (!userId && data.newName.trim()) {
+        const nm = data.newName.trim();
+        if (!nm) { toast('Add a name', 'neg'); return; }
+        // Reuse a saved contact if the name matches; else create a new one.
+        let userId;
+        const existing = State.users.find((u) => !u.isSelf && u.name.toLowerCase() === nm.toLowerCase());
+        if (existing) {
+          userId = existing.id;
+          // Fill in any handle the user typed that the saved contact lacks.
+          const ne = normEmail(data.newEmail), np = normPhone(data.newPhone);
+          if ((ne && !existing.email) || (np && !existing.phone)) {
+            existing.email = existing.email || ne; existing.phone = existing.phone || np;
+            await OrbitDB.put('users', existing);
+          }
+        } else {
           const u = {
-            id: uid('u'), name: data.newName.trim(), isSelf: false,
+            id: uid('u'), name: nm, isSelf: false,
             avatar: 'av-c' + ((State.users.length % 8) + 1),
             email: normEmail(data.newEmail), phone: normPhone(data.newPhone), upi: ''
           };
@@ -3402,7 +3414,7 @@
           State.users.push(u);
           userId = u.id;
         }
-        if (!userId) { toast('Pick or name a member', 'neg'); return; }
+        if (group.members.includes(userId)) { toast('Already in this group'); closeModal(); return; }
         group.members.push(userId);
         await OrbitDB.put('groups', group);
         // Shared group + the member has an email/phone → register a claimable
@@ -4086,6 +4098,52 @@
           signInBtn.disabled = false;
           signInBtn.classList.remove('loading');
           toast(err.code === 'auth/popup-closed-by-user' ? 'Sign-in cancelled' : ('Sign-in failed: ' + (err.message || err.code)), 'neg');
+        }
+      });
+
+      // ---- Phone-OTP alternative (Phase 3) ----
+      card.appendChild(h('div', { class: 'login-or' }, 'or'));
+      const phoneToggle = h('button', { class: 'btn', style: { width: '100%', justifyContent: 'center' } }, 'Continue with phone');
+      card.appendChild(phoneToggle);
+      card.appendChild(h('div', { id: 'recaptcha-container' }));   // invisible reCAPTCHA mounts here
+
+      const phoneBox = h('div', { style: { display: 'none', marginTop: '12px', textAlign: 'left' } });
+      const phoneInp = h('input', { class: 'input', type: 'tel', placeholder: '+91 98765 43210', style: { marginBottom: '10px' } });
+      const codeInp = h('input', { class: 'input', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '6-digit code', style: { marginBottom: '10px', display: 'none' } });
+      const actBtn = h('button', { class: 'btn btn-primary', style: { width: '100%', justifyContent: 'center' } }, 'Send code');
+      const phoneStatus = h('div', { class: 'small muted', style: { marginTop: '10px' } });
+      phoneBox.appendChild(phoneInp); phoneBox.appendChild(codeInp); phoneBox.appendChild(actBtn); phoneBox.appendChild(phoneStatus);
+      card.appendChild(phoneBox);
+
+      phoneToggle.addEventListener('click', () => {
+        signInBtn.style.display = 'none'; phoneToggle.style.display = 'none';
+        phoneBox.style.display = 'block'; phoneInp.focus();
+      });
+      let stage = 'number';
+      actBtn.addEventListener('click', async () => {
+        if (stage === 'number') {
+          let num = (phoneInp.value || '').replace(/[^\d+]/g, '');
+          if (num && !num.startsWith('+')) num = num.length === 10 ? '+91' + num : '+' + num;
+          if (num.replace(/\D/g, '').length < 8) { phoneStatus.textContent = 'Enter a valid number with country code (e.g. +91…).'; return; }
+          actBtn.disabled = true; actBtn.textContent = 'Sending…'; phoneStatus.textContent = '';
+          try {
+            await OrbitCloud.startPhoneSignIn(num, 'recaptcha-container');
+            stage = 'code'; codeInp.style.display = 'block'; phoneInp.disabled = true;
+            actBtn.textContent = 'Verify & sign in'; phoneStatus.textContent = 'Code sent to ' + num; codeInp.focus();
+          } catch (e) {
+            phoneStatus.textContent = 'Could not send code: ' + (e.message || e.code || 'error');
+            actBtn.textContent = 'Send code';
+          } finally { actBtn.disabled = false; }
+        } else {
+          const code = (codeInp.value || '').trim();
+          if (code.length < 6) { phoneStatus.textContent = 'Enter the 6-digit code.'; return; }
+          actBtn.disabled = true; actBtn.textContent = 'Verifying…';
+          try {
+            await OrbitCloud.confirmPhoneCode(code);   // onAuthChange → enterApp takes over
+          } catch (e) {
+            phoneStatus.textContent = 'Wrong or expired code. Try again.';
+            actBtn.textContent = 'Verify & sign in'; actBtn.disabled = false;
+          }
         }
       });
     }

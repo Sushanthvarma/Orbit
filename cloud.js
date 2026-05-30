@@ -16,7 +16,8 @@ import {
   getAuth, GoogleAuthProvider,
   signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
   onAuthStateChanged, setPersistence,
-  browserLocalPersistence, indexedDBLocalPersistence
+  browserLocalPersistence, indexedDBLocalPersistence,
+  RecaptchaVerifier, signInWithPhoneNumber
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
 import {
   getFirestore, collection, doc,
@@ -40,6 +41,8 @@ let _auth = null;
 let _db = null;
 let _user = null;
 let _ready = false;
+let _recaptcha = null;
+let _phoneConfirm = null;
 const _authListeners = [];
 
 const OrbitCloud = {
@@ -113,6 +116,24 @@ const OrbitCloud = {
       }
       throw e;
     }
+  },
+
+  // ---- Phone-OTP sign-in (Phase 3) ----
+  // Verifies a real phone number so claim-by-phone is trustworthy. Requires
+  // the Phone provider enabled in the Firebase console.
+  async startPhoneSignIn(phoneNumber, containerId = 'recaptcha-container') {
+    if (!_auth) throw new Error('Firebase not configured');
+    try { if (_recaptcha) { _recaptcha.clear(); } } catch (_) {}
+    _recaptcha = new RecaptchaVerifier(_auth, containerId, { size: 'invisible' });
+    _phoneConfirm = await signInWithPhoneNumber(_auth, phoneNumber, _recaptcha);
+    return { ok: true };
+  },
+  async confirmPhoneCode(code) {
+    if (!_phoneConfirm) throw new Error('Request a code first');
+    const cred = await _phoneConfirm.confirm(code);
+    _user = cred.user;
+    _phoneConfirm = null;
+    return _user;
   },
 
   async signOut() {
