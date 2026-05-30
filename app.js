@@ -485,7 +485,7 @@
     const page = h('div', { class: 'page' });
     const head = h('header', { class: 'page-header' }, [
       h('div', { class: 'title-block' }, [
-        h('h1', {}, greeting() + ', ' + (State.users.find((u) => u.id === State.selfId)?.name.split(' ')[0] || 'there')),
+        h('h1', {}, greeting() + ', ' + ((State.users.find((u) => u.id === State.selfId)?.name || '').split(' ')[0] || 'there')),
         h('div', { class: 'sub' }, 'Here\'s where you stand across all groups today.')
       ]),
       h('div', { class: 'actions' }, [
@@ -3485,20 +3485,36 @@
   // RENDER DISPATCH
   // ===================================================================
   function render() {
-    renderCrumbs();
-    renderSidebarGroups();
-    renderMeCard();
+    try { renderCrumbs(); } catch (e) { console.error('renderCrumbs', e); }
+    try { renderSidebarGroups(); } catch (e) { console.error('renderSidebarGroups', e); }
+    try { renderMeCard(); } catch (e) { console.error('renderMeCard', e); }
     const name = State.route.name;
-    if (name === 'dashboard') viewDashboard();
-    else if (name === 'groups' && State.route.params.id) viewGroupDetail(State.route.params.id);
-    else if (name === 'groups') viewGroups();
-    else if (name === 'expenses') viewExpenses();
-    else if (name === 'trips') viewTrips();
-    else if (name === 'analytics') viewAnalytics();
-    else if (name === 'activity') viewActivity();
-    else if (name === 'settle') viewSettle();
-    else if (name === 'profile') viewProfile();
-    else viewDashboard();
+    try {
+      if (name === 'dashboard') viewDashboard();
+      else if (name === 'groups' && State.route.params.id) viewGroupDetail(State.route.params.id);
+      else if (name === 'groups') viewGroups();
+      else if (name === 'expenses') viewExpenses();
+      else if (name === 'trips') viewTrips();
+      else if (name === 'analytics') viewAnalytics();
+      else if (name === 'activity') viewActivity();
+      else if (name === 'settle') viewSettle();
+      else if (name === 'profile') viewProfile();
+      else viewDashboard();
+    } catch (e) {
+      console.error('Render failed for route ' + name, e);
+      // Don't leave a blank screen — show a recovery card.
+      const page = h('div', { class: 'page' }, [
+        h('div', { class: 'card', style: { padding: '32px', textAlign: 'center', margin: '40px auto', maxWidth: '480px' } }, [
+          h('h2', { style: { margin: '0 0 8px' } }, 'Something went sideways'),
+          h('p', { class: 'small muted', style: { margin: '0 0 20px' } }, 'We hit a snag rendering this page. The error is in your browser console — please share it if it persists.'),
+          h('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center' } }, [
+            h('button', { class: 'btn btn-primary btn-sm', onClick: () => { State.route.name = 'dashboard'; location.hash = '#/dashboard'; } }, 'Back to dashboard'),
+            h('button', { class: 'btn btn-ghost btn-sm', onClick: () => location.reload() }, 'Reload')
+          ])
+        ])
+      ]);
+      setMain(page);
+    }
   }
 
   // ===================================================================
@@ -3714,9 +3730,13 @@
         phone: ''
       };
     } else {
-      // Keep our local profile but ensure email matches the signed-in account
-      if (!self.email) self.email = fbUser.email || '';
-      if (!self.name && fbUser.displayName) self.name = fbUser.displayName;
+      // Keep our local profile but ensure email + name match the signed-in
+      // Google account. The seed default ("You") gets replaced with the real
+      // display name so the dashboard greeting reads correctly.
+      if (!self.email) self.email = fbUser.email || self.email || '';
+      if (fbUser.displayName && (!self.name || self.name === 'You')) {
+        self.name = fbUser.displayName;
+      }
     }
     self.firebaseUid = fbUser.uid;
     self.photoURL = fbUser.photoURL || self.photoURL || '';

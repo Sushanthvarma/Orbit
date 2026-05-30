@@ -9,13 +9,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Profile document and every sub-collection under it.
+    // Profile document and every sub-collection (recursive) under it.
+    // The {document=**} wildcard matches any depth, so list queries on
+    // sub-collections like orbit/{uid}/expenses succeed.
+    match /orbit/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // The profile doc itself.
     match /orbit/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
-
-      match /{collection}/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
     }
 
     // Deny everything else by default.
