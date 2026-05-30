@@ -378,7 +378,7 @@
     const map = {
       dashboard: 'Dashboard', groups: 'Groups', expenses: 'Expenses',
       trips: 'Trips', activity: 'Activity', analytics: 'Analytics',
-      settle: 'Settle up', profile: 'Profile'
+      settle: 'Settle up', profile: 'Profile', join: 'Join group'
     };
     const name = State.route.name;
     root.appendChild(h('span', { class: 'crumb' }, 'Orbit'));
@@ -481,6 +481,55 @@
   }
 
   // -------- DASHBOARD --------
+  // ---- JOIN a shared group via invite link (#/join/:code) ----
+  async function viewJoin(code) {
+    const page = h('div', { class: 'page' });
+    page.appendChild(h('header', { class: 'page-header' }, [
+      h('div', { class: 'title-block' }, [
+        h('h1', {}, 'Join group'),
+        h('div', { class: 'sub' }, 'You were invited to a shared Orbit group.')
+      ])
+    ]));
+    const card = h('div', { class: 'card', style: { maxWidth: '480px', margin: '24px auto' } });
+    const body = h('div', { class: 'card-body', style: { textAlign: 'center', padding: '32px' } });
+    card.appendChild(body);
+    page.appendChild(card);
+    setMain(page);
+
+    if (!window.OrbitGroups) {
+      body.appendChild(h('p', { class: 'small muted' }, 'Shared groups are still loading. Refresh and open the link again.'));
+      return;
+    }
+    if (!code) { body.appendChild(h('p', { class: 'small muted' }, 'This invite link is incomplete.')); return; }
+
+    body.appendChild(h('div', { class: 'small muted' }, 'Checking your invite…'));
+    try {
+      const inv = await OrbitGroups.getInvite(code);
+      if (!inv) { body.innerHTML = ''; body.appendChild(h('p', {}, 'This invite was not found or has expired.')); return; }
+      const g = await OrbitGroups.getGroup(inv.groupId).catch(() => null);
+      body.innerHTML = '';
+      body.appendChild(h('div', { class: 'gc-emoji', style: { margin: '0 auto 12px', width: '48px', height: '48px', fontSize: '22px' } }, (g && g.emoji) || 'OR'));
+      body.appendChild(h('h2', { style: { margin: '0 0 6px' } }, g ? g.name : 'a shared group'));
+      body.appendChild(h('p', { class: 'small muted', style: { margin: '0 0 20px' } }, g ? ((g.memberUids ? g.memberUids.length : 1) + ' members · ' + (g.currency || 'INR')) : 'Tap join to be added.'));
+      const joinBtn = h('button', { class: 'btn btn-primary' }, 'Join this group');
+      joinBtn.addEventListener('click', async () => {
+        joinBtn.disabled = true; joinBtn.textContent = 'Joining…';
+        try {
+          const res = await OrbitGroups.acceptInvite(code);
+          toast('Joined! Welcome to the group.', 'pos');
+          navigate('#/groups/' + (res && res.groupId ? res.groupId : ''));
+        } catch (e) {
+          joinBtn.disabled = false; joinBtn.textContent = 'Join this group';
+          toast('Could not join: ' + (e.message || e.code || 'error'), 'neg');
+        }
+      });
+      body.appendChild(joinBtn);
+    } catch (e) {
+      body.innerHTML = '';
+      body.appendChild(h('p', {}, 'Could not load this invite. ' + (e.message || '')));
+    }
+  }
+
   function viewDashboard() {
     const page = h('div', { class: 'page' });
     const head = h('header', { class: 'page-header' }, [
@@ -795,6 +844,37 @@
     wrap.style.display = 'inline-flex';
     wrap.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.13a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.11.82.83-3.04-.2-.31a8.22 8.22 0 0 1-1.26-4.36c0-4.54 3.7-8.23 8.23-8.23 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.69 8.23-8.23 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.22.25-.86.84-.86 2.05 0 1.21.88 2.38 1 2.54.12.17 1.73 2.64 4.19 3.7.59.25 1.04.4 1.4.52.59.19 1.12.16 1.54.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.28Z"/></svg>';
     return wrap.firstElementChild;
+  }
+  // Create a shareable invite for a SHARED (multi-user) group and offer to
+  // send it via WhatsApp / copy link. Requires the shared-group layer
+  // (groups.js) + the group to be a shared group. Local-only groups prompt
+  // the user that sharing needs the cloud group.
+  async function inviteToGroup(g) {
+    if (!window.OrbitGroups || !OrbitGroups.isReady()) {
+      toast('Sign in to create a shareable invite.', 'neg');
+      return;
+    }
+    try {
+      // If this group only exists locally, create its shared counterpart first.
+      let sharedId = g.sharedId || g.id;
+      const existing = await OrbitGroups.getGroup(sharedId).catch(() => null);
+      if (!existing) {
+        sharedId = await OrbitGroups.createGroup({ name: g.name, currency: g.currency, emoji: g.emoji, category: g.category });
+        g.sharedId = sharedId;
+        try { await OrbitDB.put('groups', g); } catch (_) {}
+      }
+      const { url } = await OrbitGroups.createInvite(sharedId);
+      const body = h('div', {}, [
+        h('p', { class: 'small muted', style: { margin: '0 0 14px' } }, 'Anyone who opens this link and signs in joins ' + g.name + '.'),
+        h('div', { class: 'input', style: { wordBreak: 'break-all', userSelect: 'all', marginBottom: '14px' } }, url)
+      ]);
+      openInfoModal({ title: 'Invite to ' + g.name, body, actions: [
+        { label: 'Copy link', onClick: () => { copyText(url); toast('Invite link copied'); } },
+        { label: 'Share on WhatsApp', onClick: () => waOpen('Join our \'' + g.name + '\' group on Orbit to split & settle expenses: ' + url) }
+      ] });
+    } catch (e) {
+      toast('Could not create invite: ' + (e.message || e.code || 'error'), 'neg');
+    }
   }
   function copyText(t) {
     try { navigator.clipboard.writeText(t); } catch (_) {
@@ -1118,6 +1198,7 @@
         ])
       ]),
       h('div', { class: 'actions' }, [
+        h('button', { class: 'btn btn-ghost btn-sm', onClick: () => inviteToGroup(g) }, 'Invite'),
         h('button', { class: 'btn btn-ghost btn-sm', onClick: () => openConfirmModal({
           title: 'Archive group?', bodyHtml: 'You can restore later. Existing expenses stay.', confirmText: 'Archive', onConfirm: async () => { toast('Archived (demo)'); } }) }, 'Archive'),
         h('button', { class: 'btn btn-primary btn-sm', onClick: () => openExpenseModal({ groupId: g.id }) }, '+ Add expense')
@@ -3658,6 +3739,7 @@
       else if (name === 'activity') viewActivity();
       else if (name === 'settle') viewSettle();
       else if (name === 'profile') viewProfile();
+      else if (name === 'join') viewJoin(State.route.params.id);
       else viewDashboard();
     } catch (e) {
       console.error('Render failed for route ' + name, e);
@@ -3917,6 +3999,7 @@
     hideLoginGate();
     bindAppOnce();
     route();
+    maybeStartRealtime();  // Phase C: begin live shared-group sync
 
     if (!cloudOk) {
       toast('Sync unavailable — working offline. Changes save locally.', 'warn');
@@ -4001,6 +4084,7 @@
       //      timed out) — clear local state and redirect to landing.
       const handleSignOut = async () => {
         console.log('[Orbit] handling sign-out (seenSignedIn=' + _seenSignedIn + ')');
+        try { RealtimeSync.stop(); } catch (_) {}
         await OrbitDB.clearAll();
         State.users = []; State.groups = []; State.expenses = []; State.settlements = [];
         const params = new URLSearchParams(location.search);
@@ -4024,6 +4108,79 @@
       }
     });
   }
+
+  // ===================================================================
+  // PHASE C — REALTIME SHARED-GROUP SYNC
+  // Live mirror of the shared (multi-user) groups + their expenses into
+  // local State, so when any member writes, every other member's open
+  // screen updates within ~1s. Additive: legacy local groups are untouched;
+  // shared records are merged by id. Listeners are torn down on sign-out.
+  // ===================================================================
+  const RealtimeSync = (function () {
+    let _groupsUnsub = null;
+    const _expenseUnsubs = {};   // groupId -> unsubscribe
+    let _started = false;
+
+    function mergeById(arr, incoming) {
+      // Replace/insert incoming by id; keep records not in this set.
+      const map = new Map(arr.map((x) => [x.id, x]));
+      incoming.forEach((x) => map.set(x.id, x));
+      return Array.from(map.values());
+    }
+    function softRerender() {
+      // Only re-render if the user is looking at something that shows
+      // shared data (dashboard / groups / a group / expenses / settle).
+      const n = State.route.name;
+      if (['dashboard', 'groups', 'expenses', 'settle', 'activity', 'analytics'].includes(n) ||
+          (n === 'groups' && State.route.params.id)) {
+        try { render(); } catch (e) { console.warn('[Realtime] rerender failed', e); }
+      }
+      try { renderSidebarGroups(); } catch (_) {}
+    }
+
+    function watchGroupExpenses(groupId) {
+      if (_expenseUnsubs[groupId] || !window.OrbitGroups) return;
+      _expenseUnsubs[groupId] = OrbitGroups.onGroupExpenses(groupId, (expenses) => {
+        // Tag shared expenses so we can tell them apart, then merge.
+        const tagged = expenses.map((e) => Object.assign({ shared: true }, e));
+        State.expenses = mergeById(State.expenses, tagged);
+        softRerender();
+      });
+    }
+
+    return {
+      start() {
+        if (_started) return;
+        if (!window.OrbitGroups || !OrbitGroups.isReady()) return;
+        _started = true;
+        console.log('[Realtime] starting shared-group listeners');
+        // Live list of my shared groups.
+        _groupsUnsub = OrbitGroups.onMyGroups((groups) => {
+          const tagged = groups.map((g) => Object.assign({ shared: true }, g));
+          State.groups = mergeById(State.groups, tagged);
+          // (Re)subscribe to each shared group's expenses.
+          tagged.forEach((g) => watchGroupExpenses(g.id));
+          softRerender();
+        });
+      },
+      stop() {
+        if (_groupsUnsub) { try { _groupsUnsub(); } catch (_) {} _groupsUnsub = null; }
+        Object.values(_expenseUnsubs).forEach((u) => { try { u(); } catch (_) {} });
+        for (const k in _expenseUnsubs) delete _expenseUnsubs[k];
+        _started = false;
+      }
+    };
+  })();
+
+  // Kick off realtime once the shared-group layer is ready AND the user is
+  // signed in. groups.js dispatches 'orbit-groups-ready' on load; auth may
+  // resolve later, so also retry from the existing auth callback path.
+  function maybeStartRealtime() {
+    try {
+      if (window.OrbitGroups && OrbitGroups.isReady()) RealtimeSync.start();
+    } catch (_) {}
+  }
+  window.addEventListener('orbit-groups-ready', () => setTimeout(maybeStartRealtime, 300));
 
   window.addEventListener('DOMContentLoaded', boot);
   window.OrbitApp = { State, render };

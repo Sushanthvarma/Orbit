@@ -1,0 +1,17 @@
+{
+  "name": "orbit-rules-test",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project orbit-rules-test \"node test.mjs\""
+  },
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.12.4"
+  }
+}
