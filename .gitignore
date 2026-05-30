@@ -1,0 +1,22 @@
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Claude Code session state
+.claude/
+
+# Node / build (if/when we move to a build step later)
+node_modules/
+dist/
+build/
+.cache/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local env overrides
+.env
+.env.local

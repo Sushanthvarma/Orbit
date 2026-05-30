@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#F6F2EA">
+<title>Orbit — Money between friends, settled.</title>
+<meta name="description" content="Split any expense in plain English, OCR a receipt, then settle with one tap of UPI. Premium expense splitter for groups and trips.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Orbit">
+<meta property="og:title" content="Orbit — Money between friends, settled.">
+<meta property="og:description" content="Split any expense in plain English, OCR a receipt, then settle with one tap of UPI.">
+<meta property="og:image" content="icons/icon-512.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Orbit — Money between friends, settled.">
+<meta name="twitter:description" content="Split any expense in plain English, OCR a receipt, then settle with one tap of UPI.">
+<meta name="twitter:image" content="icons/icon-512.png">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F2EA; --bg-2:#FBF8F1; --card:#FFFFFF;
+  --ink:#0A0A0F; --ink-2:#3A3A45; --ink-3:#6B6F7E; --ink-4:#A0A4B0;
+  --accent:#6B5BFF; --accent-2:#8A7CFF; --accent-3:#B4A8FF;
+  --accent-soft:#EFEBFF; --accent-tint:rgba(107,91,255,.08);
+  --pos:#00A87E; --neg:#E5484D; --warn:#F5A623;
+  --line:rgba(10,10,15,.07); --line-2:rgba(10,10,15,.12);
+  --sh-1:0 1px 2px rgba(10,10,15,.04),0 0 0 1px rgba(10,10,15,.04);
+  --sh-2:0 4px 14px rgba(10,10,15,.05),0 1px 3px rgba(10,10,15,.04);
+  --sh-3:0 14px 40px rgba(10,10,15,.07),0 4px 12px rgba(10,10,15,.04);
+  --sh-4:0 40px 100px -10px rgba(10,10,15,.18),0 16px 40px -10px rgba(10,10,15,.08);
+  --sh-iris:0 30px 80px -20px rgba(107,91,255,.5),0 16px 40px -10px rgba(10,10,15,.1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font-family:'Inter',sans-serif;cursor:pointer;border:none;outline:none}
+img,svg{display:block}
+
+/* ── nav ─────────────────────────────────── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:14px 36px;background:rgba(246,242,234,.78);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid var(--line)}
+.nav-logo{display:flex;align-items:center;gap:9px;font-family:'Sora',sans-serif;font-weight:700;font-size:19px;letter-spacing:-.025em}
+.nav-ico{width:30px;height:30px;border-radius:9px;background:var(--ink);display:flex;align-items:center;justify-content:center}
+.nav-links{display:flex;align-items:center;gap:30px}
+.nav-links a{font-size:14px;color:var(--ink-3);font-weight:500;transition:color 150ms}
+.nav-links a:hover{color:var(--ink)}
+.nav-ctas{display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:10px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all 180ms cubic-bezier(.22,1,.36,1);letter-spacing:-.01em;border:none}
+.btn-text{background:transparent;color:var(--ink-2);padding:9px 14px;font-size:14px}
+.btn-text:hover{color:var(--ink)}
+.btn-dark{background:var(--ink);color:#fff;padding:10px 20px;font-size:14px}
+.btn-dark:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(10,10,15,.18)}
+
+/* ── google button (the centerpiece CTA) ─── */
+.gbtn{display:inline-flex;align-items:center;gap:12px;background:#fff;color:var(--ink);padding:14px 24px;border-radius:14px;font-weight:600;font-size:15px;border:1px solid var(--line-2);box-shadow:var(--sh-2);cursor:pointer;transition:all 200ms cubic-bezier(.22,1,.36,1);font-family:'Inter',sans-serif;letter-spacing:-.01em}
+.gbtn:hover{transform:translateY(-2px);box-shadow:var(--sh-3);border-color:var(--ink-4)}
+.gbtn-big{padding:18px 32px;font-size:16px;border-radius:16px;box-shadow:var(--sh-iris)}
+.gbtn-big:hover{box-shadow:0 40px 100px -10px rgba(107,91,255,.55),0 20px 50px -10px rgba(10,10,15,.18)}
+.gbtn svg{width:20px;height:20px;flex-shrink:0}
+
+/* ── hero ────────────────────────────────── */
+.hero{min-height:100vh;padding:120px 36px 40px;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;text-align:center}
+#hero-bg{position:absolute;inset:0;z-index:0;pointer-events:none}
+.hero-mesh{position:absolute;inset:0;background:
+  radial-gradient(900px 600px at 20% 10%,rgba(180,168,255,.45),transparent 60%),
+  radial-gradient(700px 500px at 85% 15%,rgba(255,210,180,.35),transparent 60%),
+  radial-gradient(800px 700px at 50% 90%,rgba(165,210,255,.3),transparent 60%);z-index:0;pointer-events:none}
+.hero-inner{position:relative;z-index:3;max-width:860px;margin:0 auto;padding-top:24px}
+
+.badge{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.7);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:999px;padding:7px 16px;font-size:12.5px;font-weight:600;color:var(--ink-2);letter-spacing:0;margin-bottom:36px;box-shadow:var(--sh-1)}
+.badge-dot{width:6px;height:6px;border-radius:999px;background:var(--accent);box-shadow:0 0 0 4px rgba(107,91,255,.18);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 4px rgba(107,91,255,.18)}50%{transform:scale(.85);box-shadow:0 0 0 8px rgba(107,91,255,.06)}}
+
+.h1{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(48px,7.5vw,96px);letter-spacing:-.045em;line-height:.98;margin-bottom:28px;color:var(--ink)}
+.h1 .em{font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;letter-spacing:-.02em;background:linear-gradient(135deg,var(--accent) 0%,#8A7CFF 60%,#B4A8FF 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;display:inline-block;padding-right:.06em}
+
+.hero-sub{font-size:19px;color:var(--ink-3);max-width:560px;margin:0 auto 40px;line-height:1.55;font-weight:400}
+.hero-acts{display:flex;gap:14px;justify-content:center;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+.play-btn{display:inline-flex;align-items:center;gap:8px;color:var(--ink-2);font-weight:500;font-size:15px;background:transparent;padding:14px 20px}
+.play-btn-circle{width:28px;height:28px;border-radius:999px;background:var(--ink);display:flex;align-items:center;justify-content:center}
+.hero-fineprint{font-size:13px;color:var(--ink-4);font-weight:500}
+.hero-fineprint b{color:var(--ink-3);font-weight:600}
+
+/* ── 3d phone scene ───────────────────────── */
+.scene{position:relative;width:100%;max-width:1100px;margin:80px auto 0;height:620px;perspective:1800px;perspective-origin:50% 30%}
+.scene-floor{position:absolute;left:50%;bottom:-40px;width:80%;height:60px;background:radial-gradient(ellipse,rgba(10,10,15,.18),transparent 70%);transform:translateX(-50%);filter:blur(20px);z-index:0}
+
+.phone{position:absolute;background:#0A0A0F;border-radius:42px;overflow:hidden;border:8px solid #1a1a22;box-shadow:0 60px 120px -20px rgba(10,10,15,.45),0 30px 60px -15px rgba(107,91,255,.18),inset 0 0 0 1px rgba(255,255,255,.06);transition:transform .6s cubic-bezier(.22,1,.36,1)}
+.ph-screen{background:#0E0E14;width:100%;height:100%;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.ph-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px 8px;font-size:10px;color:#fff;font-weight:600}
+.ph-bar-r{display:flex;align-items:center;gap:5px}
+.ph-body{padding:8px 18px 18px;flex:1;display:flex;flex-direction:column;color:#ECEDEE}
+
+.ph-center{left:50%;top:30px;width:280px;height:560px;transform:translateX(-50%) rotateX(8deg) translateZ(40px);z-index:3}
+.ph-left{left:50%;top:80px;width:255px;height:520px;transform:translateX(-260%) rotateY(28deg) rotateX(8deg) translateZ(-20px) scale(.95);z-index:2}
+.ph-right{left:50%;top:80px;width:255px;height:520px;transform:translateX(160%) rotateY(-28deg) rotateX(8deg) translateZ(-20px) scale(.95);z-index:2}
+
+/* phone screen content — dark mode dashboard */
+.ph-title{font-family:'Sora',sans-serif;font-size:18px;font-weight:700;letter-spacing:-.02em;margin-bottom:14px;color:#fff}
+.ph-hero-card{background:linear-gradient(135deg,rgba(107,91,255,.2),rgba(107,91,255,.05));border:1px solid rgba(107,91,255,.25);border-radius:18px;padding:18px;margin-bottom:14px;text-align:center}
+.ph-hl{font-size:10px;color:#A5ABBC;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;font-weight:600}
+.ph-bigval{font-family:'Sora',sans-serif;font-size:36px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.ph-bigval.pos{color:#34D399}
+.ph-sub{font-size:11px;color:#A5ABBC;margin-top:6px}
+
+.ph-row{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border-radius:14px;padding:12px;margin-bottom:8px}
+.ph-ava{width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.ph-row-name{font-size:13px;font-weight:600;color:#fff}
+.ph-row-sub{font-size:11px;color:#6E7589;margin-top:1px}
+.ph-row-amt{font-family:'Sora',sans-serif;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;color:#34D399;margin-left:auto}
+
+/* center phone — UPI moment */
+.ph-pay-circle{width:64px;height:64px;border-radius:999px;background:linear-gradient(135deg,#6B5BFF,#8A7CFF);display:flex;align-items:center;justify-content:center;margin:24px auto 16px;box-shadow:0 16px 40px rgba(124,108,255,.5)}
+.ph-pay-lbl{font-size:10px;color:#A5ABBC;text-transform:uppercase;font-weight:600;letter-spacing:.06em;text-align:center;margin-bottom:6px}
+.ph-pay-val{font-family:'Sora',sans-serif;font-size:46px;font-weight:700;letter-spacing:-.04em;font-variant-numeric:tabular-nums;text-align:center;line-height:1;color:#fff}
+.ph-pay-to{font-size:11px;color:#A5ABBC;text-align:center;margin-top:6px;margin-bottom:20px}
+.ph-rail-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.ph-rail{background:rgba(255,255,255,.05);border-radius:12px;padding:10px;text-align:center;cursor:pointer}
+.ph-rail.on{background:rgba(124,108,255,.15);border:1px solid rgba(124,108,255,.4)}
+.ph-rail-ico{width:24px;height:24px;border-radius:7px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff}
+.ph-rail-lbl{font-size:9px;color:#A5ABBC;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.ph-rail.on .ph-rail-lbl{color:#8A7CFF}
+.ph-cta{width:100%;background:#fff;color:#0A0A0F;border:none;border-radius:14px;padding:14px;font-family:'Sora',sans-serif;font-weight:700;font-size:13px;letter-spacing:-.01em;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+
+/* right phone — AI entry */
+.ph-ai-card{background:linear-gradient(135deg,rgba(124,108,255,.15),rgba(124,108,255,.03));border:1px solid rgba(124,108,255,.3);border-radius:14px;padding:12px;margin-bottom:12px}
+.ph-ai-lbl{font-size:9px;color:#8A7CFF;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.ph-ai-txt{font-size:11.5px;color:#ECEDEE;line-height:1.5}
+.ph-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.ph-chip{font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px}
+.ph-chip.a{background:rgba(52,211,153,.18);color:#34D399}
+.ph-chip.p{background:rgba(124,108,255,.18);color:#8A7CFF}
+.ph-split-list{margin-top:8px}
+.ph-split{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid rgba(255,255,255,.07);font-size:12px}
+.ph-split-name{font-weight:500;color:#ECEDEE}
+.ph-split-amt{font-family:'Sora',sans-serif;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* floating glass stickers */
+.sticker{position:absolute;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.6);border-radius:14px;padding:10px 14px;box-shadow:var(--sh-3);z-index:5;animation:float 6s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.sticker-1{top:120px;left:8%;animation-delay:0s;transform:rotate(-6deg)}
+.sticker-2{top:180px;right:5%;animation-delay:1s;transform:rotate(5deg)}
+.sticker-3{bottom:140px;left:14%;animation-delay:2s;transform:rotate(4deg)}
+.sticker-4{bottom:180px;right:9%;animation-delay:1.5s;transform:rotate(-5deg)}
+
+.sticker-row{display:flex;align-items:center;gap:8px}
+.sticker-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.sticker-l1{font-size:11px;color:var(--ink-3);font-weight:500;line-height:1.2}
+.sticker-l2{font-family:'Sora',sans-serif;font-size:14px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.2;margin-top:2px}
+
+/* ── sections base ────────────────────────── */
+section{padding:120px 36px;position:relative}
+.eyebrow{display:inline-block;font-size:12.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:18px}
+.h2{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(34px,5vw,58px);letter-spacing:-.035em;line-height:1.05;margin-bottom:22px;color:var(--ink)}
+.h2 .em{font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;color:var(--accent);letter-spacing:-.01em}
+.sub{font-size:18px;color:var(--ink-3);max-width:540px;line-height:1.55}
+
+/* ── AI demo section ──────────────────────── */
+.ai-section{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:1fr 1.1fr;gap:80px;align-items:center}
+.ai-mock{background:#fff;border-radius:24px;box-shadow:var(--sh-4);padding:8px;position:relative;transform:perspective(1400px) rotateY(-6deg) rotateX(2deg);transform-style:preserve-3d}
+.ai-mock-inner{background:#0A0A0F;border-radius:18px;padding:28px;color:#fff;min-height:380px;position:relative;overflow:hidden}
+.ai-window-bar{display:flex;gap:6px;margin-bottom:24px}
+.ai-window-bar span{width:11px;height:11px;border-radius:999px;background:rgba(255,255,255,.2)}
+.ai-window-bar span:first-child{background:#FB7185}
+.ai-window-bar span:nth-child(2){background:#FBBF24}
+.ai-window-bar span:nth-child(3){background:#34D399}
+.ai-input-mock{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px 18px;margin-bottom:18px}
+.ai-input-lbl{font-size:11px;color:#8A7CFF;font-weight:700;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.ai-input-text{font-size:16px;color:#fff;line-height:1.5;font-weight:500}
+.ai-cursor{display:inline-block;width:2px;height:18px;background:#8A7CFF;vertical-align:middle;animation:blink 1s steps(2) infinite;margin-left:2px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.ai-parsed-lbl{font-size:11px;color:#A5ABBC;letter-spacing:.06em;text-transform:uppercase;font-weight:600;margin-bottom:10px}
+.ai-parsed-row{background:rgba(255,255,255,.04);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;animation:slideIn 400ms cubic-bezier(.22,1,.36,1) both}
+@keyframes slideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+.ai-parsed-row:nth-child(2){animation-delay:.1s}.ai-parsed-row:nth-child(3){animation-delay:.2s}.ai-parsed-row:nth-child(4){animation-delay:.3s}
+.ai-parsed-name{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px}
+.ai-parsed-dot{width:8px;height:8px;border-radius:999px}
+.ai-parsed-amt{font-family:'Sora',sans-serif;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;color:#34D399}
+
+/* ── settle showcase ──────────────────────── */
+.settle-section{background:linear-gradient(180deg,transparent,rgba(107,91,255,.04));max-width:none;padding-top:120px;padding-bottom:120px}
+.settle-inner{max-width:1240px;margin:0 auto;text-align:center}
+.settle-stage{margin-top:80px;background:#fff;border-radius:32px;box-shadow:var(--sh-4);padding:60px 40px;position:relative;overflow:hidden}
+.settle-grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(107,91,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(107,91,255,.04) 1px,transparent 1px);background-size:32px 32px;mask-image:radial-gradient(ellipse 70% 60% at center,#000 30%,transparent 80%)}
+.settle-canvas-wrap{position:relative;height:340px}
+#settle-canvas{width:100%;height:100%;display:block}
+
+.settle-result{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:760px;margin:40px auto 0}
+.settle-result-card{background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:18px 20px;text-align:left;transition:all 200ms}
+.settle-result-card:hover{transform:translateY(-3px);box-shadow:var(--sh-3);border-color:var(--accent-soft)}
+.settle-result-flow{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px;color:var(--ink-2)}
+.settle-result-flow b{font-weight:600;color:var(--ink)}
+.settle-result-arrow{color:var(--ink-4)}
+.settle-result-amt{font-family:'Sora',sans-serif;font-weight:700;font-size:24px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink);margin-bottom:10px}
+.settle-result-btn{background:var(--ink);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+
+/* ── features ─────────────────────────────── */
+.features-inner{max-width:1240px;margin:0 auto}
+.features-head{text-align:center;margin-bottom:64px}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.feat-card{background:#fff;border-radius:20px;padding:32px;border:1px solid var(--line);box-shadow:var(--sh-1);transition:all 250ms cubic-bezier(.22,1,.36,1);cursor:default;position:relative;overflow:hidden}
+.feat-card:hover{transform:translateY(-4px);box-shadow:var(--sh-3);border-color:var(--accent-soft)}
+.feat-ico{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 8px 20px rgba(107,91,255,.3)}
+
+
+.feat-ttl{font-family:'Sora',sans-serif;font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
+.feat-desc{font-size:14.5px;color:var(--ink-3);line-height:1.55}
+.feat-free{display:inline-block;margin-top:14px;font-size:11px;font-weight:700;color:var(--pos);background:rgba(0,168,126,.1);padding:3px 9px;border-radius:6px;letter-spacing:.04em;text-transform:uppercase}
+
+/* ── all-free strip ───────────────────────── */
+.free-strip{background:var(--ink);color:#fff;border-radius:28px;max-width:1240px;margin:0 auto;padding:64px 56px;display:flex;align-items:center;justify-content:space-between;gap:40px;position:relative;overflow:hidden}
+.free-strip::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 600px 400px at 80% 50%,rgba(107,91,255,.4),transparent 70%);pointer-events:none}
+.free-strip-l{flex:1;position:relative;z-index:2}
+.free-strip-eyebrow{font-size:12.5px;font-weight:700;color:var(--accent-3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
+.free-strip-h{font-family:'Sora',sans-serif;font-size:46px;font-weight:700;letter-spacing:-.035em;line-height:1.05;margin-bottom:14px}
+.free-strip-h .em{font-family:'Instrument Serif',serif;font-style:italic;color:var(--accent-3);font-weight:400}
+.free-strip-sub{font-size:16px;color:rgba(255,255,255,.7);max-width:480px;line-height:1.55}
+.free-strip-r{position:relative;z-index:2}
+
+/* ── final cta ────────────────────────────── */
+.cta-section{padding:140px 36px 120px;text-align:center;position:relative;overflow:hidden}
+.cta-mesh{position:absolute;inset:0;background:radial-gradient(800px 600px at center,rgba(180,168,255,.4),transparent 60%);pointer-events:none}
+.cta-inner{position:relative;z-index:2;max-width:680px;margin:0 auto}
+.cta-h{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(36px,5vw,60px);letter-spacing:-.04em;line-height:1.05;margin-bottom:20px}
+.cta-h .em{font-family:'Instrument Serif',serif;font-style:italic;color:var(--accent);font-weight:400}
+.cta-sub{font-size:18px;color:var(--ink-3);margin-bottom:36px}
+.cta-fineprint{margin-top:18px;font-size:13px;color:var(--ink-4)}
+
+/* ── footer ───────────────────────────────── */
+footer{padding:40px 36px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px}
+.foot-l{display:flex;align-items:center;gap:10px;font-family:'Sora',sans-serif;font-weight:700;font-size:16px;letter-spacing:-.025em}
+.foot-r{display:flex;gap:24px}
+.foot-r a{font-size:13.5px;color:var(--ink-3);font-weight:500;transition:color 150ms}
+.foot-r a:hover{color:var(--ink)}
+.foot-c{font-size:13px;color:var(--ink-4)}
+
+/* ── reveal anim ──────────────────────────── */
+.rv{opacity:0;transform:translateY(28px);transition:opacity 700ms cubic-bezier(.22,1,.36,1),transform 700ms cubic-bezier(.22,1,.36,1)}
+.rv.in{opacity:1;transform:none}
+
+/* responsive */
+@media(max-width:960px){
+  nav{padding:12px 20px}
+  .nav-links{display:none}
+  .btn-text{display:none}
+  .ai-section{grid-template-columns:1fr;gap:48px}
+  .ai-mock{transform:none}
+  .feat-grid{grid-template-columns:1fr 1fr;gap:14px}
+  .settle-result{grid-template-columns:1fr;gap:10px}
+  .scene{height:560px;perspective:1200px}
+  .ph-left,.ph-right{display:none}
+  .ph-center{width:260px;height:540px;left:50%;top:20px}
+  .sticker{transform:scale(.85)}
+  .sticker-1{top:90px;left:4%}
+  .sticker-2{top:160px;right:3%}
+  .sticker-3{bottom:120px;left:6%}
+  .sticker-4{bottom:160px;right:6%}
+  section{padding:80px 22px}
+  .hero{padding:100px 22px 40px}
+  .h1{font-size:clamp(40px,9vw,68px)}
+  .hero-sub{font-size:17px}
+  .gbtn-big{padding:16px 28px;font-size:15px}
+}
+@media(max-width:640px){
+  nav{padding:10px 16px}
+  .nav-logo{font-size:17px}
+  .nav-ico{width:28px;height:28px}
+  .feat-grid{grid-template-columns:1fr}
+  .h1{font-size:clamp(36px,11vw,56px)}
+  .hero-sub{font-size:16px;margin-bottom:32px}
+  .hero{padding:88px 18px 32px;min-height:auto}
+  .badge{font-size:11px;padding:6px 13px;margin-bottom:24px}
+  section{padding:64px 18px}
+  .scene{height:520px;margin-top:48px}
+  .ph-center{width:230px;height:480px}
+  .ph-pay-val{font-size:38px}
+  .h2{font-size:clamp(26px,7vw,40px)}
+  .sub{font-size:15px}
+  .ai-mock-inner{padding:22px;min-height:auto}
+  .ai-input-text{font-size:14px}
+  .settle-stage{padding:36px 20px;border-radius:24px}
+  .settle-canvas-wrap{height:280px}
+  .settle-result-card{padding:14px 16px}
+  .feat-card{padding:24px;border-radius:16px}
+  .feat-ttl{font-size:17px}
+  .feat-desc{font-size:14px}
+  .cta-section{padding:96px 22px 80px}
+  .cta-h{font-size:clamp(28px,8vw,42px)}
+  .hero-acts{flex-direction:column;width:100%}
+  .hero-acts .gbtn,.hero-acts .play-btn{width:100%;justify-content:center}
+  .play-btn{padding:14px 20px}
+  footer{flex-direction:column;align-items:flex-start;gap:16px;padding:32px 22px}
+  .foot-r{flex-wrap:wrap;gap:18px}
+  /* hide some stickers on tiny screens */
+  .sticker-2,.sticker-3{display:none}
+  .sticker-1{top:60px;left:2%;transform:scale(.78) rotate(-6deg)}
+  .sticker-4{bottom:120px;right:2%;transform:scale(.78) rotate(-5deg)}
+}
+</style>
+</head>
+<body>
+
+<!-- ── nav ─────────────────────────────────── -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-ico">
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="2.6" fill="white"/><ellipse cx="8.5" cy="8.5" rx="7.5" ry="3.5" stroke="white" stroke-width="1.2" fill="none" transform="rotate(-35 8.5 8.5)" opacity=".75"/><ellipse cx="8.5" cy="8.5" rx="7.5" ry="3.5" stroke="white" stroke-width="1.2" fill="none" transform="rotate(35 8.5 8.5)" opacity=".4"/></svg>
+    </div>
+    Orbit
+  </div>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#ai">AI</a>
+    <a href="#settle">Settle</a>
+    <a href="#everything">Everything</a>
+    <a href="#" class="js-signin" data-cta="nav-open">Open app →</a>
+  </div>
+  <div class="nav-ctas">
+    <button class="btn btn-text js-signin" data-cta="nav-signin">Sign in</button>
+    <button class="btn btn-dark js-signin" data-cta="nav-get-started">Get started</button>
+  </div>
+</nav>
+
+<!-- ── hero ────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-mesh"></div>
+  <canvas id="hero-bg"></canvas>
+
+  <div class="hero-inner">
+    <div class="badge rv in">
+      <span class="badge-dot"></span>
+      Early access · UPI native · Made in India
+    </div>
+    <h1 class="h1 rv in" style="transition-delay:.05s">Money between friends, <span class="em">settled.</span></h1>
+    <p class="hero-sub rv in" style="transition-delay:.1s">Split any expense in plain English, OCR a receipt, then settle with one tap of UPI. The kind of app you tell your group chat about.</p>
+    <div class="hero-acts rv in" style="transition-delay:.15s">
+      <button class="gbtn gbtn-big js-signin" data-cta="hero">
+        <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+    <div class="hero-fineprint rv in" style="transition-delay:.2s">
+      AI parses any split · Settle via UPI · Works with everyone
+    </div>
+  </div>
+
+  <!-- 3D phone scene -->
+  <div class="scene rv in" style="transition-delay:.3s">
+    <div class="scene-floor"></div>
+
+    <!-- floating glass stickers -->
+    <div class="sticker sticker-1">
+      <div class="sticker-row">
+        <div class="sticker-ico" style="background:rgba(0,168,126,.15)">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-6" stroke="#00A87E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div>
+          <div class="sticker-l1">Ananya paid you</div>
+          <div class="sticker-l2" style="color:var(--pos)">+₹2,400</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sticker sticker-2">
+      <div class="sticker-row">
+        <div class="sticker-ico" style="background:rgba(107,91,255,.15)">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1l1.3 2.7L11 5 8.3 6.3 7 9 5.7 6.3 3 5l2.7-1.3L7 1z" fill="#6B5BFF"/></svg>
+        </div>
+        <div>
+          <div class="sticker-l1">AI parsed split</div>
+          <div class="sticker-l2">4 people · ₹3,600</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sticker sticker-3">
+      <div class="sticker-row">
+        <div class="sticker-ico" style="background:rgba(245,166,35,.15)">📸</div>
+        <div>
+          <div class="sticker-l1">Receipt scanned</div>
+          <div class="sticker-l2">12 items · 60s</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sticker sticker-4">
+      <div class="sticker-row">
+        <div class="sticker-ico" style="background:rgba(107,91,255,.15)">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M8 2l5 5-5 5" stroke="#6B5BFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div>
+          <div class="sticker-l1">Settled via UPI</div>
+          <div class="sticker-l2">3 tx · 2 sec</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- left phone — balances -->
+    <div class="phone ph-left">
+      <div class="ph-screen">
+        <div class="ph-bar"><span>9:41</span><div class="ph-bar-r"><span>●●●</span><span>📶</span><span>🔋</span></div></div>
+        <div class="ph-body">
+          <div class="ph-title">Goa Trip 🏖️</div>
+          <div class="ph-hero-card">
+            <div class="ph-hl">You're owed</div>
+            <div class="ph-bigval pos">+₹2,800</div>
+            <div class="ph-sub">across 2 friends</div>
+          </div>
+          <div class="ph-row">
+            <div class="ph-ava" style="background:#FB7185">A</div>
+            <div><div class="ph-row-name">Ananya</div><div class="ph-row-sub">owes you</div></div>
+            <div class="ph-row-amt">₹1,600</div>
+          </div>
+          <div class="ph-row">
+            <div class="ph-ava" style="background:#60A5FA">V</div>
+            <div><div class="ph-row-name">Vikram</div><div class="ph-row-sub">owes you</div></div>
+            <div class="ph-row-amt">₹1,200</div>
+          </div>
+          <div class="ph-row">
+            <div class="ph-ava" style="background:#FBBF24">P</div>
+            <div><div class="ph-row-name">Priya</div><div class="ph-row-sub">settled</div></div>
+            <div class="ph-row-amt" style="color:#6E7589">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- center phone — UPI moment -->
+    <div class="phone ph-center">
+      <div class="ph-screen">
+        <div class="ph-bar"><span>9:41</span><div class="ph-bar-r"><span>●●●</span><span>📶</span><span>🔋</span></div></div>
+        <div class="ph-body">
+          <div class="ph-pay-circle">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M5 14h18M16 6l8 8-8 8" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="ph-pay-lbl">Settling with</div>
+          <div class="ph-pay-val">₹2,800</div>
+          <div class="ph-pay-to">to Rohan Mehta · rohan@ybl</div>
+          <div class="ph-rail-grid">
+            <div class="ph-rail"><div class="ph-rail-ico" style="background:#5F259F">P</div><div class="ph-rail-lbl">PhonePe</div></div>
+            <div class="ph-rail on"><div class="ph-rail-ico" style="background:#fff;color:#000">G</div><div class="ph-rail-lbl">GPay</div></div>
+            <div class="ph-rail"><div class="ph-rail-ico" style="background:#00BAF2">P</div><div class="ph-rail-lbl">Paytm</div></div>
+          </div>
+          <button class="ph-cta">
+            Pay ₹2,800
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5h9M7 2l4.5 4.5L7 11" stroke="#0A0A0F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- right phone — AI -->
+    <div class="phone ph-right">
+      <div class="ph-screen">
+        <div class="ph-bar"><span>9:41</span><div class="ph-bar-r"><span>●●●</span><span>📶</span><span>🔋</span></div></div>
+        <div class="ph-body">
+          <div class="ph-title">New expense ✨</div>
+          <div class="ph-ai-card">
+            <div class="ph-ai-lbl">
+              <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M4.5 1L5.4 3.2 8 4.5 5.4 5.8 4.5 8 3.6 5.8 1 4.5 3.6 3.2 4.5 1z" fill="currentColor"/></svg>
+              AI understood
+            </div>
+            <div class="ph-ai-txt">"Split Bandra dinner four ways but Ananya only had drinks"</div>
+            <div class="ph-chips">
+              <span class="ph-chip a">₹3,600</span>
+              <span class="ph-chip p">4 ppl</span>
+              <span class="ph-chip p">Ananya ½</span>
+            </div>
+          </div>
+          <div class="ph-split-list">
+            <div class="ph-split"><span class="ph-split-name">Rohan (you)</span><span class="ph-split-amt" style="color:#FB7185">₹900</span></div>
+            <div class="ph-split"><span class="ph-split-name">Arjun</span><span class="ph-split-amt" style="color:#FB7185">₹900</span></div>
+            <div class="ph-split"><span class="ph-split-name">Kavya</span><span class="ph-split-amt" style="color:#FB7185">₹900</span></div>
+            <div class="ph-split"><span class="ph-split-name">Ananya</span><span class="ph-split-amt" style="color:#8A7CFF">₹450</span></div>
+          </div>
+          <button class="ph-cta" style="margin-top:14px;background:#6B5BFF;color:#fff">Save split</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── AI demo section ──────────────────────── -->
+<section id="ai">
+  <div class="ai-section">
+    <div class="rv">
+      <div class="eyebrow">AI entry</div>
+      <h2 class="h2">Just <span class="em">say it.</span><br>We'll do the math.</h2>
+      <p class="sub" style="margin-bottom:32px">Type how you split. Orbit's AI catches who owes what — including half shares, custom ratios, and "Ananya only had drinks."</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px">
+        <span class="ph-chip p" style="font-size:12px;padding:6px 12px">Natural language</span>
+        <span class="ph-chip p" style="font-size:12px;padding:6px 12px">Receipt OCR</span>
+      </div>
+      <button class="btn btn-dark js-signin" data-cta="ai-section" style="padding:12px 22px;font-size:14px">Try it in the app →</button>
+    </div>
+    <div class="ai-mock rv" style="transition-delay:.1s">
+      <div class="ai-mock-inner">
+        <div class="ai-window-bar"><span></span><span></span><span></span></div>
+        <div class="ai-input-mock">
+          <div class="ai-input-lbl">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1L6 3.5 8.5 4.5 6 5.5 5 8 4 5.5 1.5 4.5 4 3.5 5 1z" fill="currentColor"/></svg>
+            Describe a split
+          </div>
+          <div class="ai-input-text" id="typewriter">Split Bandra dinner four ways but Ananya only had drinks<span class="ai-cursor"></span></div>
+        </div>
+        <div class="ai-parsed-lbl">Orbit parsed</div>
+        <div class="ai-parsed-row">
+          <span class="ai-parsed-name"><span class="ai-parsed-dot" style="background:#FB7185"></span>Ananya</span>
+          <span class="ai-parsed-amt">₹450</span>
+        </div>
+        <div class="ai-parsed-row">
+          <span class="ai-parsed-name"><span class="ai-parsed-dot" style="background:#6B5BFF"></span>Rohan (you)</span>
+          <span class="ai-parsed-amt">₹900</span>
+        </div>
+        <div class="ai-parsed-row">
+          <span class="ai-parsed-name"><span class="ai-parsed-dot" style="background:#34D399"></span>Arjun</span>
+          <span class="ai-parsed-amt">₹900</span>
+        </div>
+        <div class="ai-parsed-row">
+          <span class="ai-parsed-name"><span class="ai-parsed-dot" style="background:#FBBF24"></span>Kavya</span>
+          <span class="ai-parsed-amt">₹900</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── settle showcase ──────────────────────── -->
+<section id="settle" class="settle-section">
+  <div class="settle-inner">
+    <div class="rv">
+      <div class="eyebrow">Trip-end settle</div>
+      <h2 class="h2" style="max-width:760px;margin-left:auto;margin-right:auto">From 14 messy transactions<br>to <span class="em">3 perfect ones.</span></h2>
+      <p class="sub" style="margin:0 auto">When the Goa trip ends, Orbit shows the minimum number of payments to zero everything out. Tap any flow to launch UPI.</p>
+    </div>
+    <div class="settle-stage rv" style="transition-delay:.1s">
+      <div class="settle-grid-bg"></div>
+      <div class="settle-canvas-wrap">
+        <canvas id="settle-canvas"></canvas>
+      </div>
+      <div class="settle-result">
+        <div class="settle-result-card">
+          <div class="settle-result-flow"><b style="color:#E5484D">Ananya</b><span class="settle-result-arrow">→</span><b>Rohan</b></div>
+          <div class="settle-result-amt">₹2,800</div>
+          <button class="settle-result-btn">Pay via UPI</button>
+        </div>
+        <div class="settle-result-card">
+          <div class="settle-result-flow"><b style="color:#E5484D">Priya</b><span class="settle-result-arrow">→</span><b>Rohan</b></div>
+          <div class="settle-result-amt">₹1,400</div>
+          <button class="settle-result-btn">Pay via UPI</button>
+        </div>
+        <div class="settle-result-card">
+          <div class="settle-result-flow"><b>Rohan</b><span class="settle-result-arrow">→</span><b style="color:#00A87E">Arjun</b></div>
+          <div class="settle-result-amt">₹1,200</div>
+          <button class="settle-result-btn">Pay via UPI</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── features ─────────────────────────────── -->
+<section id="everything">
+  <div class="features-inner">
+    <div class="features-head rv">
+      <div class="eyebrow">Features</div>
+      <h2 class="h2" style="max-width:720px;margin-left:auto;margin-right:auto">Built for the way<br>friends <span class="em">actually split.</span></h2>
+      <p class="sub" style="margin:0 auto">AI, OCR, UPI settle, multi-currency, voice. All in one place.</p>
+    </div>
+
+    <div class="feat-grid">
+      <div class="feat-card rv">
+        <div class="feat-ico">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2l1.6 4.5L17 8l-3.5 3 .8 4.5L11 13.5 7.7 15.5l.8-4.5L5 8l4.4-1.5L11 2z" fill="white"/></svg>
+        </div>
+        <div class="feat-ttl">AI natural language</div>
+        <div class="feat-desc">Describe any split in plain words. Orbit catches people, amounts, custom ratios, and special cases automatically.</div>
+        
+      </div>
+      <div class="feat-card rv" style="transition-delay:.05s">
+        <div class="feat-ico">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="4" y="4" width="14" height="14" rx="3" stroke="white" stroke-width="1.8" fill="none"/><path d="M7 11h8M7 8h8M7 14h5" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <div class="feat-ttl">Receipt OCR</div>
+        <div class="feat-desc">Snap a bill and Orbit reads every line item. Tap to assign each dish to whoever ate it.</div>
+        
+      </div>
+      <div class="feat-card rv" style="transition-delay:.1s">
+        <div class="feat-ico">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 11h16M11 3l8 8-8 8" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="feat-ttl">One-tap UPI settle</div>
+        <div class="feat-desc">Deep-links to PhonePe, GPay, Paytm with VPA, amount, and note pre-filled. We never hold your money.</div>
+        
+      </div>
+      <div class="feat-card rv" style="transition-delay:.15s">
+        <div class="feat-ico">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="6" cy="11" r="3" stroke="white" stroke-width="1.8" fill="none"/><circle cx="16" cy="6" r="3" stroke="white" stroke-width="1.8" fill="none"/><circle cx="16" cy="16" r="3" stroke="white" stroke-width="1.8" fill="none"/><path d="M8.7 10l4.6-2.8M8.7 12l4.6 2.8" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <div class="feat-ttl">Minimum settlements</div>
+        <div class="feat-desc">Trip-end algorithm computes the fewest payments to zero a group. Less awkward, faster done.</div>
+        
+      </div>
+      <div class="feat-card rv" style="transition-delay:.2s">
+        <div class="feat-ico">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="7" stroke="white" stroke-width="1.8" fill="none"/><path d="M4 11h14M11 4a10 10 0 0 1 0 14M11 4a10 10 0 0 0 0 14" stroke="white" stroke-width="1.4" fill="none"/></svg>
+        </div>
+        <div class="feat-ttl">Multi-currency</div>
+        <div class="feat-desc">Travel groups get FX-locked rates the day each expense happens. See everything in your home currency.</div>
+        
+      </div>
+      <div class="feat-card rv" style="transition-delay:.25s">
+        <div class="feat-ico">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="6" y="3" width="10" height="14" rx="3" stroke="white" stroke-width="1.8" fill="none"/><path d="M11 13v3" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+        <div class="feat-ttl">Built for India</div>
+        <div class="feat-desc">UPI deep-links, lakh / crore number format, INR-first. Settle with the apps you already use.</div>
+        
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── final cta ────────────────────────────── -->
+<section class="cta-section">
+  <div class="cta-mesh"></div>
+  <div class="cta-inner">
+    <div class="rv">
+      <h2 class="cta-h">Stop chasing.<br>Start <span class="em">settling.</span></h2>
+      <p class="cta-sub">Splits ready in seconds. Settle with one tap of UPI.</p>
+      <button class="gbtn gbtn-big js-signin" data-cta="final">
+        <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+        Continue with Google
+      </button>
+      <div class="cta-fineprint">Sign in with Google · Splits ready in 8 seconds</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── footer ───────────────────────────────── -->
+<footer>
+  <div class="foot-l">
+    <div class="nav-ico" style="width:26px;height:26px;border-radius:7px">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="2.2" fill="white"/><ellipse cx="7.5" cy="7.5" rx="6.8" ry="3" stroke="white" stroke-width="1.1" fill="none" transform="rotate(-35 7.5 7.5)" opacity=".75"/><ellipse cx="7.5" cy="7.5" rx="6.8" ry="3" stroke="white" stroke-width="1.1" fill="none" transform="rotate(35 7.5 7.5)" opacity=".4"/></svg>
+    </div>
+    Orbit
+  </div>
+  <div class="foot-r"></div>
+  <div class="foot-c">© 2026 Orbit · Made in India</div>
+</footer>
+
+<script>
+// ── hero bg canvas ─────────────────────────
+const hbg = document.getElementById('hero-bg');
+const hc = hbg.getContext('2d');
+function resizeHero(){ hbg.width = hbg.offsetWidth; hbg.height = hbg.offsetHeight; }
+resizeHero(); window.addEventListener('resize', resizeHero);
+let t = 0;
+(function loop(){
+  hc.clearRect(0, 0, hbg.width, hbg.height);
+  t += .006;
+  // subtle dots
+  hc.fillStyle = 'rgba(107,91,255,.04)';
+  for (let x = 24; x < hbg.width; x += 36)
+    for (let y = 24; y < hbg.height; y += 36)
+      hc.fillRect(x-.7, y-.7, 1.4, 1.4);
+  requestAnimationFrame(loop);
+})();
+
+// ── reveal on scroll ──────────────────────
+const obs = new IntersectionObserver(e=>{
+  e.forEach(x=>{ if (x.isIntersecting){ x.target.classList.add('in'); obs.unobserve(x.target); } });
+}, { threshold:.12 });
+document.querySelectorAll('.rv:not(.in)').forEach(el=>obs.observe(el));
+
+// ── scroll parallax for phones ────────────
+const scene = document.querySelector('.scene');
+window.addEventListener('scroll', () => {
+  if (!scene) return;
+  const y = window.scrollY;
+  const stickers = document.querySelectorAll('.sticker');
+  stickers.forEach((s, i) => {
+    const dir = i % 2 === 0 ? 1 : -1;
+    s.style.translate = `0 ${y * .08 * dir}px`;
+  });
+});
+
+// ── settle network canvas ─────────────────
+const sc = document.getElementById('settle-canvas');
+function setupSettle(){
+  const dpr = devicePixelRatio || 1;
+  const w = sc.offsetWidth, h = sc.offsetHeight;
+  sc.width = w * dpr; sc.height = h * dpr;
+  const x = sc.getContext('2d');
+  x.scale(dpr, dpr);
+  return { x, w, h };
+}
+
+function drawSettle(){
+  const { x, w, h } = setupSettle();
+  x.clearRect(0, 0, w, h);
+  const cx = w/2, cy = h/2, R = Math.min(w, h) * .36;
+  const people = [
+    { id:'Rohan',  c:'#6B5BFF', a:-Math.PI/2 },
+    { id:'Ananya', c:'#E5484D', a:-Math.PI/2 + 2*Math.PI/5 },
+    { id:'Arjun',  c:'#00A87E', a:-Math.PI/2 + 4*Math.PI/5 },
+    { id:'Priya',  c:'#F5A623', a:-Math.PI/2 + 6*Math.PI/5 },
+    { id:'Vikram', c:'#60A5FA', a:-Math.PI/2 + 8*Math.PI/5 },
+  ];
+  people.forEach(p => { p.x = cx + Math.cos(p.a)*R; p.y = cy + Math.sin(p.a)*R; });
+
+  // settle edges (the 3 optimal payments)
+  const edges = [
+    { f:1, t:0, a:'₹2,800' },
+    { f:3, t:0, a:'₹1,400' },
+    { f:0, t:2, a:'₹1,200' },
+  ];
+
+  edges.forEach(e => {
+    const A = people[e.f], B = people[e.t];
+    // curved gradient line
+    const grd = x.createLinearGradient(A.x, A.y, B.x, B.y);
+    grd.addColorStop(0, A.c + '55');
+    grd.addColorStop(1, B.c + 'CC');
+    x.strokeStyle = grd;
+    x.lineWidth = 2.5;
+    const mx = (A.x+B.x)/2 + (A.y-B.y)*.12, my = (A.y+B.y)/2 + (B.x-A.x)*.12;
+    x.beginPath();
+    x.moveTo(A.x, A.y);
+    x.quadraticCurveTo(mx, my, B.x, B.y);
+    x.stroke();
+
+    // arrowhead
+    const dx = B.x - mx, dy = B.y - my, l = Math.hypot(dx,dy);
+    const nx = dx/l, ny = dy/l;
+    x.beginPath();
+    x.moveTo(B.x - nx*16, B.y - ny*16);
+    x.lineTo(B.x - nx*16 - ny*8, B.y - ny*16 + nx*8);
+    x.lineTo(B.x - nx*16 + ny*8, B.y - ny*16 - nx*8);
+    x.closePath();
+    x.fillStyle = B.c;
+    x.fill();
+
+    // amount label with white pill
+    const lx = mx, ly = my - 4;
+    x.font = '600 12.5px Inter';
+    const tw = x.measureText(e.a).width;
+    x.fillStyle = '#fff';
+    x.beginPath();
+    x.roundRect(lx - tw/2 - 10, ly - 14, tw + 20, 22, 11);
+    x.fill();
+    x.strokeStyle = 'rgba(10,10,15,.08)';
+    x.lineWidth = 1;
+    x.stroke();
+    x.fillStyle = '#0A0A0F';
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.fillText(e.a, lx, ly - 3);
+  });
+
+  // nodes
+  people.forEach(p => {
+    // soft glow
+    const g = x.createRadialGradient(p.x, p.y, 0, p.x, p.y, 36);
+    g.addColorStop(0, p.c + '40'); g.addColorStop(1, p.c + '00');
+    x.fillStyle = g;
+    x.beginPath(); x.arc(p.x, p.y, 36, 0, 2*Math.PI); x.fill();
+
+    // node fill
+    x.beginPath(); x.arc(p.x, p.y, 22, 0, 2*Math.PI);
+    x.fillStyle = '#fff'; x.fill();
+    x.strokeStyle = p.c; x.lineWidth = 2.5; x.stroke();
+
+    // initial inside
+    x.font = '700 14px Sora';
+    x.fillStyle = p.c;
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(p.id[0], p.x, p.y);
+
+    // name below
+    x.font = '600 13px Inter';
+    x.fillStyle = '#0A0A0F';
+    x.fillText(p.id, p.x, p.y + 38);
+  });
+}
+
+// wait for layout
+setTimeout(drawSettle, 100);
+window.addEventListener('resize', () => setTimeout(drawSettle, 100));
+// redraw when revealed
+new IntersectionObserver((es) => {
+  es.forEach(e => { if (e.isIntersecting) setTimeout(drawSettle, 200); });
+}, { threshold:.3 }).observe(document.getElementById('settle-canvas'));
+
+// ── typewriter effect in AI demo ─────────
+const typewriterEl = document.getElementById('typewriter');
+if (typewriterEl) {
+  const phrases = [
+    'Split Bandra dinner four ways but Ananya only had drinks',
+    '₹4,200 cab from airport, just me and Arjun',
+    'Goa hotel split equally between everyone except Vikram',
+    'Add ₹850 groceries to the flat group',
+  ];
+  let pi = 0, ci = 0, deleting = false;
+  function type() {
+    const p = phrases[pi];
+    if (!deleting) {
+      ci++;
+      typewriterEl.innerHTML = p.slice(0, ci) + '<span class="ai-cursor"></span>';
+      if (ci === p.length) { deleting = true; setTimeout(type, 2200); return; }
+      setTimeout(type, 35 + Math.random()*40);
+    } else {
+      ci--;
+      typewriterEl.innerHTML = p.slice(0, ci) + '<span class="ai-cursor"></span>';
+      if (ci === 0) { deleting = false; pi = (pi+1) % phrases.length; setTimeout(type, 400); return; }
+      setTimeout(type, 18);
+    }
+  }
+  setTimeout(type, 1800);
+}
+</script>
+
+<!-- Firebase sign-in wiring (added for orbit-web integration) -->
+<script src="firebase-config.js"></script>
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
+  import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, setPersistence, browserLocalPersistence }
+    from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+
+  const cfg = window.FIREBASE_CONFIG;
+  const configured = cfg && cfg.apiKey && !/REPLACE_ME/.test(cfg.apiKey);
+  if (!configured) {
+    console.warn('Firebase not configured — landing sign-in disabled.');
+  } else {
+    const app = initializeApp(cfg);
+    const auth = getAuth(app);
+    try { await setPersistence(auth, browserLocalPersistence); } catch (_) {}
+
+    // If already signed in, jump straight to the dashboard.
+    onAuthStateChanged(auth, (u) => {
+      if (u) location.replace('./index.html#/dashboard');
+    });
+
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    document.querySelectorAll('.js-signin').forEach((el) => {
+      el.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        el.setAttribute('disabled', 'true');
+        const orig = el.textContent;
+        try {
+          if (el.tagName === 'BUTTON' && el.querySelector('svg')) {
+            // keep the SVG; just dim the button via attribute
+          } else {
+            el.textContent = 'Opening Google…';
+          }
+          await signInWithPopup(auth, provider);
+          // onAuthStateChanged will redirect once auth state settles
+        } catch (err) {
+          console.error('Sign-in failed', err);
+          alert('Sign-in failed: ' + (err.message || err.code));
+          el.removeAttribute('disabled');
+          if (orig) el.textContent = orig;
+        }
+      });
+    });
+  }
+</script>
+</body>
+</html>

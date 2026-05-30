@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1024" />
+  <meta name="theme-color" content="#F6F2EA" />
+  <title>Orbit — Split smarter</title>
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=3" />
+</head>
+<body>
+  <!-- Background mesh + soft dot grid (always rendering) -->
+  <div class="bg-mesh"></div>
+  <div class="bg-grid"></div>
+
+  <!-- Login gate (shown when signed out) -->
+  <div id="loginGate" class="login-gate" hidden></div>
+
+  <div id="app" class="app-shell">
+    <!-- Top bar -->
+    <header class="topbar" id="topbar">
+      <div class="topbar-left">
+        <a class="brand" href="#/dashboard" aria-label="Orbit home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-name">Orbit</span>
+        </a>
+        <span class="brand-divider" aria-hidden="true"></span>
+        <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+      </div>
+      <div class="topbar-center">
+        <div class="search" role="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="globalSearch" type="text" placeholder="Search expenses, groups, friends…" autocomplete="off" />
+          <kbd>/</kbd>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-ghost btn-sm" id="aiQuickTop" title="Quick add with AI (Q)" style="gap:6px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9L19 14z"/></svg>
+          Quick add
+        </button>
+        <button class="btn btn-ghost btn-sm" id="newExpenseTop" title="Add expense (N)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          New expense
+        </button>
+        <button class="icon-btn" id="themeToggle" title="Toggle theme">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        </button>
+        <button class="avatar-btn" id="meAvatar" title="Profile" aria-label="Profile menu">
+          <span class="avatar avatar-sm" data-user="u_self">S</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar" aria-label="Primary">
+      <nav class="nav-section">
+        <div class="nav-label">Workspace</div>
+        <a class="nav-item" data-route="dashboard" href="#/dashboard"><span class="nav-icon">D</span><span>Dashboard</span></a>
+        <a class="nav-item" data-route="groups" href="#/groups"><span class="nav-icon">G</span><span>Groups</span></a>
+        <a class="nav-item" data-route="expenses" href="#/expenses"><span class="nav-icon">E</span><span>Expenses</span></a>
+        <a class="nav-item" data-route="trips" href="#/trips"><span class="nav-icon">T</span><span>Trips</span></a>
+        <a class="nav-item" data-route="activity" href="#/activity"><span class="nav-icon">A</span><span>Activity</span></a>
+        <a class="nav-item" data-route="analytics" href="#/analytics"><span class="nav-icon">N</span><span>Analytics</span></a>
+        <a class="nav-item" data-route="settle" href="#/settle"><span class="nav-icon">S</span><span>Settle up</span></a>
+      </nav>
+
+      <nav class="nav-section">
+        <div class="nav-label nav-label-row">
+          <span>Groups</span>
+          <button class="mini-btn" id="sidebarNewGroup" title="New group">+</button>
+        </div>
+        <div id="sidebarGroups" class="nav-groups"></div>
+      </nav>
+
+      <div class="sidebar-foot">
+        <a class="nav-item" data-route="profile" href="#/profile"><span class="nav-icon">P</span><span>Profile</span></a>
+        <div class="me-card" id="meCard"></div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main" id="main"></main>
+  </div>
+
+  <!-- Modal root -->
+  <div id="modalRoot"></div>
+  <!-- Toast root -->
+  <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+
+  <script src="firebase-config.js?v=2"></script>
+  <script src="db.js?v=2"></script>
+  <script src="seed.js?v=2"></script>
+  <script src="importers.js?v=2"></script>
+  <script src="recurring.js?v=1"></script>
+  <script src="activity.js?v=1"></script>
+  <script src="exporters.js?v=1"></script>
+  <script src="ai.js?v=2"></script>
+  <script src="ocr.js?v=2"></script>
+  <script src="fx.js?v=2"></script>
+  <script type="module" src="cloud.js?v=3"></script>
+  <script src="app.js?v=6"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+    }
+  </script>
+</body>
+</html>
