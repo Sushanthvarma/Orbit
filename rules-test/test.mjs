@@ -81,7 +81,11 @@ async function run() {
   });
 
   // ---- USERS PROFILES ----
-  await check('signed-in user CAN read another profile', () => assertSucceeds(getDoc(doc(db('carol'), 'users/alice'))));
+  await check('signed-in user CAN read another profile by uid (get)', () => assertSucceeds(getDoc(doc(db('carol'), 'users/alice'))));
+  // The fix: nobody can enumerate the whole users collection to harvest
+  // every email/phone/UPI. A get-by-uid is fine; a list/query is denied.
+  await check('signed-in user CANNOT list/enumerate the users collection', () => assertFails(getDocs(collection(db('carol'), 'users'))));
+  await check('signed-out CANNOT read a profile', () => assertFails(getDoc(doc(db(null), 'users/alice'))));
   await check('user CAN write own profile', () => assertSucceeds(setDoc(doc(db('carol'), 'users/carol'), { name: 'Carol' })));
   await check('user CANNOT write another user profile', () => assertFails(setDoc(doc(db('carol'), 'users/alice'), { name: 'hacked' })));
 
