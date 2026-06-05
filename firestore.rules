@@ -43,11 +43,17 @@ service cloud.firestore {
     // SHARED multi-user model (Phase A).
     // ============================================================
 
-    // Public-ish profile per real user. Anyone signed in may READ a
-    // profile (needed to render co-members' names/avatars), but only
-    // the owner may write their own.
+    // Public-ish profile per real user. A signed-in user may GET an
+    // individual profile *if they already know the uid* (needed to render a
+    // co-member's name/avatar/UPI). LIST is denied so nobody can enumerate the
+    // whole user base and harvest every email / phone / UPI id — uids are
+    // unguessable, so you only learn one by sharing a group with that person.
+    // (The owner-side "add existing user by email/phone" lookup runs in a
+    // trusted Cloud Function with the admin SDK, which bypasses these rules,
+    // so denying client list/query here breaks nothing.)
     match /users/{profileUid} {
-      allow read: if signedIn();
+      allow get: if signedIn();
+      allow list: if false;
       allow write: if signedIn() && uid() == profileUid;
     }
 
