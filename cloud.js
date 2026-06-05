@@ -200,8 +200,12 @@ const OrbitCloud = {
     try {
       await setDoc(doc(_db, 'orbit', _user.uid, store, id), obj);
     } catch (e) {
-      await new Promise((r) => setTimeout(r, 600));
-      await setDoc(doc(_db, 'orbit', _user.uid, store, id), obj);
+      // One retry after a short backoff; swallow a persistent failure so this
+      // fire-and-forget call never becomes an unhandled promise rejection.
+      try {
+        await new Promise((r) => setTimeout(r, 600));
+        await setDoc(doc(_db, 'orbit', _user.uid, store, id), obj);
+      } catch (e2) { console.warn('[cloud] write failed (will retry on next sync):', store, id, e2 && e2.code); }
     }
   },
 
@@ -210,8 +214,10 @@ const OrbitCloud = {
     try {
       await deleteDoc(doc(_db, 'orbit', _user.uid, store, String(id)));
     } catch (e) {
-      await new Promise((r) => setTimeout(r, 600));
-      await deleteDoc(doc(_db, 'orbit', _user.uid, store, String(id)));
+      try {
+        await new Promise((r) => setTimeout(r, 600));
+        await deleteDoc(doc(_db, 'orbit', _user.uid, store, String(id)));
+      } catch (e2) { console.warn('[cloud] delete failed (will retry on next sync):', store, id, e2 && e2.code); }
     }
   },
 

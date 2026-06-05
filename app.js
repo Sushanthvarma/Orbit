@@ -52,6 +52,28 @@
       if (typeof c === 'string' || typeof c === 'number') el.appendChild(document.createTextNode(String(c)));
       else el.appendChild(c);
     });
+    // Auto-label icon-only buttons for screen readers. A button whose visible
+    // text is empty or a single glyph gets an aria-label from its `title` (or a
+    // glyph map). Buttons with real text labels are left untouched.
+    if (el.tagName === 'BUTTON' && !el.getAttribute('aria-label')) {
+      const txt = (el.textContent || '').trim();
+      if (txt === '' || txt.length === 1) {
+        const map = { '×': 'Close', '✕': 'Close', '✎': 'Edit', '+': 'Add', '✓': 'Done', '↻': 'Refresh' };
+        const lbl = attrs.title || map[txt];
+        if (lbl) el.setAttribute('aria-label', lbl);
+      }
+    }
+    // Keyboard activation for whole-row navigations built on non-interactive
+    // tags (e.g. <tr class="clickable">, <div class="group-card">). Without
+    // this they're mouse-only. Allowlisted by class so we don't turn the modal
+    // backdrop or settle rows (which carry their own buttons) into buttons.
+    if (attrs.onClick && !attrs.role && attrs.tabindex == null
+      && typeof attrs.class === 'string' && /\b(clickable|group-card)\b/.test(attrs.class)
+      && !/^(BUTTON|A|INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) {
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } });
+    }
     return el;
   }
   function el(html) {
@@ -257,30 +279,62 @@
   // ===================================================================
   // BALANCE / COMPUTATION
   // ===================================================================
+  // ---- Payers ----
+  // An expense may be paid by several people. Multi-payer expenses carry a
+  // `payers` array [{userId, amount}]; legacy / single-payer expenses fall back
+  // to the single `paidBy` for the whole amount. All balance math reads through
+  // these helpers so single- and multi-payer expenses behave identically.
+  function expensePayers(exp) {
+    if (Array.isArray(exp.payers) && exp.payers.length) return exp.payers;
+    return [{ userId: exp.paidBy, amount: exp.amount }];
+  }
+  function paidByUser(exp, userId) {
+    return expensePayers(exp).reduce((s, p) => s + (p.userId === userId ? p.amount : 0), 0);
+  }
+  function isPayer(exp, userId) { return expensePayers(exp).some((p) => p.userId === userId); }
+  function firstPayerId(exp) { return expensePayers(exp)[0].userId; }
+  function payerLabel(exp) {
+    const ps = expensePayers(exp);
+    if (ps.length === 1) return userName(ps[0].userId);
+    if (ps.length === 2) return userName(ps[0].userId) + ' & ' + userName(ps[1].userId);
+    return ps.length + ' people';
+  }
+
   function expenseAffectsUser(exp, userId) {
-    if (exp.paidBy === userId) return true;
+    if (isPayer(exp, userId)) return true;
     if ((exp.splits || []).some((s) => s.userId === userId)) return true;
     return false;
   }
 
   // Returns map { userId: balance } where positive means "they owe you", negative means "you owe them"
   // Filtered to a single user (the self user) — net per other user.
-  function computePairBalances(selfId, groupId = null) {
+  // Pass `currency` to restrict to one currency (INR/EUR/…) — otherwise the
+  // sum mixes currencies numerically (₹ + € as if same unit), which is wrong.
+  function computePairBalances(selfId, groupId = null, currency = null) {
     const result = {};
-    const exps = groupId ? State.expenses.filter((e) => e.groupId === groupId) : State.expenses;
-    const setts = groupId ? State.settlements.filter((s) => s.groupId === groupId) : State.settlements;
+    let exps = groupId ? State.expenses.filter((e) => e.groupId === groupId) : State.expenses;
+    let setts = groupId ? State.settlements.filter((s) => s.groupId === groupId) : State.settlements;
+    if (currency) {
+      exps = exps.filter((e) => (e.currency || 'INR') === currency);
+      setts = setts.filter((s) => (s.currency || 'INR') === currency);
+    }
 
     exps.forEach((exp) => {
-      const myShare = (exp.splits.find((s) => s.userId === selfId) || {}).amount || 0;
-      if (exp.paidBy === selfId) {
-        exp.splits.forEach((s) => {
-          if (s.userId !== selfId) {
-            result[s.userId] = (result[s.userId] || 0) + s.amount;
-          }
-        });
-      } else if (myShare > 0) {
-        result[exp.paidBy] = (result[exp.paidBy] || 0) - myShare;
-      }
+      const amount = exp.amount || 0;
+      if (amount <= 0) return;
+      const shareSelf = (exp.splits.find((s) => s.userId === selfId) || {}).amount || 0;
+      const fSelf = paidByUser(exp, selfId) / amount;   // fraction of the bill self funded
+      // Every other person who is a participant OR a payer in this expense.
+      const others = new Set();
+      exp.splits.forEach((s) => { if (s.userId !== selfId) others.add(s.userId); });
+      expensePayers(exp).forEach((p) => { if (p.userId !== selfId) others.add(p.userId); });
+      others.forEach((o) => {
+        const shareO = (exp.splits.find((s) => s.userId === o) || {}).amount || 0;
+        const fO = paidByUser(exp, o) / amount;
+        // self funded fSelf of o's share (o owes self) minus o funded fO of self's share (self owes o)
+        const delta = fSelf * shareO - fO * shareSelf;
+        if (Math.abs(delta) > 1e-7) result[o] = (result[o] || 0) + delta;
+      });
     });
 
     setts.forEach((s) => {
@@ -309,7 +363,7 @@
     const setts = State.settlements.filter((s) => s.groupId === groupId);
 
     exps.forEach((exp) => {
-      net[exp.paidBy] = (net[exp.paidBy] || 0) + exp.amount;
+      expensePayers(exp).forEach((p) => { net[p.userId] = (net[p.userId] || 0) + p.amount; });
       exp.splits.forEach((s) => { net[s.userId] = (net[s.userId] || 0) - s.amount; });
     });
     setts.forEach((s) => {
@@ -319,6 +373,19 @@
 
     Object.keys(net).forEach((k) => { net[k] = Math.round(net[k] * 100) / 100; });
     return { members, net };
+  }
+
+  // Push any rounding residual onto the last split so the splits sum EXACTLY to
+  // the total (to the paisa). Used by every split mode at save time.
+  function reconcileSplits(splits, total) {
+    if (!splits.length) return splits;
+    const sum = splits.reduce((s, x) => s + x.amount, 0);
+    const diff = Math.round((total - sum) * 100) / 100;
+    if (Math.abs(diff) >= 0.005) {
+      const last = splits[splits.length - 1];
+      last.amount = Math.round((last.amount + diff) * 100) / 100;
+    }
+    return splits;
   }
 
   // Greedy debt simplification — returns [{from,to,amount,currency}]
@@ -346,12 +413,7 @@
   }
 
   function myNetTotal(currency = 'INR') {
-    // Net across INR-priced groups only (mixed-currency aware UI shows split).
-    const bal = computePairBalances(State.selfId);
-    let net = 0;
-    Object.entries(bal).forEach(([uid, v]) => { net += v; });
-    // Adjust: above is global without currency awareness.
-    // Re-implement per-currency:
+    // Net for a single currency (mixed-currency UI shows each split separately).
     return computeNetByCurrency()[currency] || 0;
   }
   function computeNetByCurrency() {
@@ -360,8 +422,8 @@
       const cur = exp.currency || 'INR';
       out[cur] = out[cur] || 0;
       const myShare = (exp.splits.find((s) => s.userId === State.selfId) || {}).amount || 0;
-      if (exp.paidBy === State.selfId) out[cur] += (exp.amount - myShare);
-      else if (myShare > 0) out[cur] -= myShare;
+      // My net on this expense = what I paid − my share (works for any number of payers).
+      out[cur] += (paidByUser(exp, State.selfId) - myShare);
     });
     State.settlements.forEach((s) => {
       const cur = s.currency || 'INR';
@@ -374,13 +436,13 @@
   }
 
   function totalYouOwe(currency = 'INR') {
-    const bal = computePairBalances(State.selfId);
+    const bal = computePairBalances(State.selfId, null, currency);
     let v = 0;
     Object.values(bal).forEach((x) => { if (x < 0) v += -x; });
     return Math.round(v * 100) / 100;
   }
   function totalOwedToYou(currency = 'INR') {
-    const bal = computePairBalances(State.selfId);
+    const bal = computePairBalances(State.selfId, null, currency);
     let v = 0;
     Object.values(bal).forEach((x) => { if (x > 0) v += x; });
     return Math.round(v * 100) / 100;
@@ -396,13 +458,13 @@
       r = r.filter((e) =>
         e.title.toLowerCase().includes(q) ||
         (e.note || '').toLowerCase().includes(q) ||
-        userNameFull(e.paidBy).toLowerCase().includes(q) ||
+        expensePayers(e).some((p) => userNameFull(p.userId).toLowerCase().includes(q)) ||
         (groupById(e.groupId)?.name || '').toLowerCase().includes(q)
       );
     }
     if (f.groupId) r = r.filter((e) => e.groupId === f.groupId);
     if (f.category) r = r.filter((e) => e.category === f.category);
-    if (f.paidBy) r = r.filter((e) => e.paidBy === f.paidBy);
+    if (f.paidBy) r = r.filter((e) => isPayer(e, f.paidBy));
     if (f.from) r = r.filter((e) => e.date >= new Date(f.from).toISOString());
     if (f.to) r = r.filter((e) => e.date <= new Date(f.to + 'T23:59:59').toISOString());
     return r;
@@ -502,11 +564,11 @@
   // SIDEBAR
   // ===================================================================
   function updateSidebarActive() {
-    $$('.nav-item, .tab-item').forEach((n) => n.classList.remove('active'));
+    $$('.nav-item, .tab-item').forEach((n) => { n.classList.remove('active'); n.removeAttribute('aria-current'); });
     const name = State.route.name;
     // Light up both the desktop sidebar item and the mobile tab-bar item.
     document.querySelectorAll(`.nav-item[data-route="${name}"], .tab-item[data-route="${name}"]`)
-      .forEach((el) => el.classList.add('active'));
+      .forEach((el) => { el.classList.add('active'); el.setAttribute('aria-current', 'page'); });
     // Routes that live under the mobile "More" sheet light up that tab.
     const more = document.querySelector('#tabMore');
     if (more && ['expenses', 'settle', 'trips', 'analytics', 'profile'].includes(name)) more.classList.add('active');
@@ -555,8 +617,7 @@
     State.expenses.forEach((e) => {
       if (e.groupId !== groupId) return;
       const myShare = (e.splits.find((s) => s.userId === State.selfId) || {}).amount || 0;
-      if (e.paidBy === State.selfId) v += e.amount - myShare;
-      else if (myShare > 0) v -= myShare;
+      v += paidByUser(e, State.selfId) - myShare;
     });
     State.settlements.forEach((s) => {
       if (s.groupId !== groupId) return;
@@ -587,6 +648,26 @@
     main.innerHTML = '';
     main.appendChild(node);
     main.scrollTop = 0;
+    // Announce the new view to screen readers (SPA route changes are otherwise
+    // silent) and move focus to its first heading for keyboard users.
+    try {
+      const heading = node.querySelector && node.querySelector('h1');
+      if (heading) {
+        announce(heading.textContent || 'Page updated');
+        heading.setAttribute('tabindex', '-1');
+      }
+    } catch (_) {}
+  }
+  let _liveRegion = null;
+  function announce(msg) {
+    if (!_liveRegion) {
+      _liveRegion = document.createElement('div');
+      _liveRegion.setAttribute('aria-live', 'polite');
+      _liveRegion.className = 'sr-only';
+      document.body.appendChild(_liveRegion);
+    }
+    _liveRegion.textContent = '';
+    setTimeout(() => { _liveRegion.textContent = msg; }, 30);
   }
 
   // -------- DASHBOARD --------
@@ -769,12 +850,12 @@
       });
     });
   }
-  function countCreditors() {
-    const b = computePairBalances(State.selfId);
+  function countCreditors(currency = 'INR') {
+    const b = computePairBalances(State.selfId, null, currency);
     return Object.values(b).filter((v) => v > 0.01).length;
   }
-  function countDebtors() {
-    const b = computePairBalances(State.selfId);
+  function countDebtors(currency = 'INR') {
+    const b = computePairBalances(State.selfId, null, currency);
     return Object.values(b).filter((v) => v < -0.01).length;
   }
 
@@ -791,7 +872,7 @@
       title: (e) => e.title,
       amount: (e) => e.amount,
       myShare: (e) => (e.splits.find((s) => s.userId === State.selfId) || {}).amount || 0,
-      paidBy: (e) => userNameFull(e.paidBy)
+      paidBy: (e) => payerLabel(e)
     });
     const top = sorted.slice(0, 8);
     const wrap = h('div', { class: 'tbl-wrap' });
@@ -821,9 +902,9 @@
             h('div', { class: 'note' }, categoryLabel(e.category))
           ])
         ])));
-        tr.appendChild(h('td', {}, h('span', { class: 'who' }, [avatar(e.paidBy, 'sm'), userName(e.paidBy)])));
+        tr.appendChild(h('td', {}, h('span', { class: 'who' }, [avatar(firstPayerId(e), 'sm'), payerLabel(e)])));
         tr.appendChild(h('td', { class: 'col-amt' }, fmtMoney(e.amount, e.currency)));
-        tr.appendChild(h('td', { class: 'col-amt ' + (e.paidBy === State.selfId ? 'pos' : 'neg') }, fmtMoney(myShare, e.currency)));
+        tr.appendChild(h('td', { class: 'col-amt ' + ((paidByUser(e, State.selfId) - myShare) >= 0 ? 'pos' : 'neg') }, fmtMoney(myShare, e.currency)));
         tbody.appendChild(tr);
       });
     }
@@ -869,7 +950,7 @@
       h('h3', {}, 'Settle now'),
       h('a', { class: 'sub', href: '#/settle' }, 'Open →')
     ]));
-    const bal = computePairBalances(State.selfId);
+    const bal = computePairBalances(State.selfId, null, 'INR');
     const debts = Object.entries(bal).filter(([, v]) => v < -0.01).sort((a, b) => a[1] - b[1]);
     const body = h('div', { class: 'card-body', style: { padding: 0 } });
     if (debts.length === 0) {
@@ -1085,14 +1166,7 @@
       bodyHtml: `Record that you paid <strong>${escapeHtml(userNameFull(otherUserId))}</strong> ${escapeHtml(fmtMoney(amount, 'INR'))} outside Orbit.`,
       confirmText: 'Mark settled',
       onConfirm: async () => {
-        const s = {
-          id: uid('s'), groupId: '', fromUser: State.selfId, toUser: otherUserId,
-          amount, currency: 'INR', method: 'manual', date: todayISO(), note: 'Manual settle'
-        };
-        await OrbitDB.put('settlements', s);
-        State.settlements.push(s);
-        toast('Settled with ' + userNameFull(otherUserId), 'pos');
-        render();
+        await recordSettlementSmart(State.selfId, otherUserId, amount, 'INR');
       }
     });
   }
@@ -1460,7 +1534,7 @@
     const sortState = State.sort.groupExpenses;
     const rows = sortRows(State.expenses.filter((e) => e.groupId === g.id), sortState, {
       date: (e) => e.date, title: (e) => e.title, category: (e) => e.category,
-      amount: (e) => e.amount, paidBy: (e) => userNameFull(e.paidBy),
+      amount: (e) => e.amount, paidBy: (e) => payerLabel(e),
       myShare: (e) => (e.splits.find((s) => s.userId === State.selfId) || {}).amount || 0
     });
     const card = h('div', { class: 'card' });
@@ -1491,9 +1565,9 @@
           ])
         ])));
         tr.appendChild(h('td', {}, h('span', { class: 'cat cat-' + e.category }, categoryLabel(e.category))));
-        tr.appendChild(h('td', {}, h('span', { class: 'who' }, [avatar(e.paidBy, 'sm'), userName(e.paidBy)])));
+        tr.appendChild(h('td', {}, h('span', { class: 'who' }, [avatar(firstPayerId(e), 'sm'), payerLabel(e)])));
         tr.appendChild(h('td', { class: 'col-amt' }, fmtMoney(e.amount, e.currency)));
-        tr.appendChild(h('td', { class: 'col-amt ' + (e.paidBy === State.selfId ? 'pos' : 'neg') }, fmtMoney(myShare, e.currency)));
+        tr.appendChild(h('td', { class: 'col-amt ' + ((paidByUser(e, State.selfId) - myShare) >= 0 ? 'pos' : 'neg') }, fmtMoney(myShare, e.currency)));
         tr.appendChild(h('td', { class: 'col-actions' }, [
           h('button', { title: 'Edit', onClick: (ev) => { ev.stopPropagation(); openExpenseModal({ existing: e }); } }, '✎'),
           h('button', { title: 'Delete', onClick: (ev) => { ev.stopPropagation(); confirmDeleteExpense(e); } }, '✕')
@@ -1519,7 +1593,7 @@
     const exps = State.expenses.filter((e) => e.groupId === g.id);
     mat.members.forEach((m) => {
       let paid = 0, share = 0;
-      exps.forEach((e) => { if (e.paidBy === m) paid += e.amount; const sp = e.splits.find((s) => s.userId === m); if (sp) share += sp.amount; });
+      exps.forEach((e) => { paid += paidByUser(e, m); const sp = e.splits.find((s) => s.userId === m); if (sp) share += sp.amount; });
       State.settlements.filter((s) => s.groupId === g.id).forEach((s) => { if (s.fromUser === m) paid += s.amount; if (s.toUser === m) share += s.amount; });
       const net = mat.net[m];
       const tr2 = h('tr');
@@ -1578,16 +1652,88 @@
     render();
   }
 
-  async function recordSettlement(groupId, fromUser, toUser, amount, currency) {
-    const s = { id: uid('s'), groupId, fromUser, toUser, amount, currency, method: 'manual', date: todayISO(), note: 'Marked settled' };
+  // Re-entrancy guard: a fast double-tap (or two people marking the same row)
+  // must NOT record two settlements — that would over-settle into a phantom
+  // reverse debt. Keyed by from:to:currency for the brief window of the write.
+  const _settleLock = new Set();
+
+  async function persistSettlement(s) {
     await OrbitDB.put('settlements', s);
     State.settlements.push(s);
     if (window.OrbitActivity) OrbitActivity.log(OrbitDB, {
       actorId: State.selfId, action: 'settle', entityType: 'settlement',
       entityId: s.id, groupId: s.groupId, snapshot: s
     });
-    toast('Settlement recorded', 'pos');
-    render();
+    syncSettlementIfShared(s);   // mirror to Firestore when the group is shared
+  }
+
+  // Per-group settle (the row already knows its real groupId).
+  async function recordSettlement(groupId, fromUser, toUser, amount, currency) {
+    const lk = fromUser + ':' + toUser + ':' + (currency || 'INR') + ':' + groupId;
+    if (_settleLock.has(lk)) return;
+    _settleLock.add(lk);
+    try {
+      await persistSettlement({
+        id: uid('s'), groupId, fromUser, toUser, amount,
+        currency: currency || 'INR', method: 'manual', date: todayISO(), note: 'Marked settled'
+      });
+      toast('Settlement recorded', 'pos');
+      render();
+    } finally { setTimeout(() => _settleLock.delete(lk), 400); }
+  }
+
+  // Global "Smart settle" produces a simplified from→to amount with NO group.
+  // Decompose it into the per-group debts it actually pays off so each group's
+  // ledger reconciles (otherwise the global view clears while the group view
+  // still shows the debt). Any leftover that maps to no shared group is kept as
+  // a single un-grouped record.
+  function allocateSettlement(fromUser, toUser, amount, currency) {
+    const cur = currency || 'INR';
+    const records = [];
+    let remaining = Math.round(amount * 100) / 100;
+    const candidates = State.groups
+      .filter((g) => Array.isArray(g.members) && g.members.includes(fromUser) && g.members.includes(toUser))
+      .map((g) => {
+        const pb = computePairBalances(fromUser, g.id, cur);     // from's perspective
+        const owes = Math.round((-(pb[toUser] || 0)) * 100) / 100; // >0 ⇒ from owes to here
+        return { id: g.id, owes };
+      })
+      .filter((x) => x.owes > 0.005)
+      .sort((a, b) => b.owes - a.owes);
+    for (const c of candidates) {
+      if (remaining <= 0.005) break;
+      const a = Math.min(c.owes, remaining);
+      const amt = Math.round(a * 100) / 100;
+      records.push({ id: uid('s'), groupId: c.id, fromUser, toUser, amount: amt, currency: cur, method: 'manual', date: todayISO(), note: 'Marked settled' });
+      remaining = Math.round((remaining - amt) * 100) / 100;
+    }
+    if (remaining > 0.005) {
+      records.push({ id: uid('s'), groupId: '', fromUser, toUser, amount: remaining, currency: cur, method: 'manual', date: todayISO(), note: 'Marked settled' });
+    }
+    return records;
+  }
+
+  async function recordSettlementSmart(fromUser, toUser, amount, currency) {
+    const cur = currency || 'INR';
+    const lk = fromUser + ':' + toUser + ':' + cur + ':*';
+    if (_settleLock.has(lk)) return;
+    _settleLock.add(lk);
+    try {
+      const records = allocateSettlement(fromUser, toUser, amount, cur);
+      for (const s of records) await persistSettlement(s);
+      toast('Settlement recorded', 'pos');
+      render();
+    } finally { setTimeout(() => _settleLock.delete(lk), 400); }
+  }
+
+  // Mirror a settlement to its group's Firestore copy when the group is shared.
+  async function syncSettlementIfShared(s) {
+    if (!s.groupId) return;
+    const g = groupById(s.groupId);
+    const sid = sharedIdOf(g);
+    if (!sid || !canShare() || !OrbitGroups.addSettlement) return;
+    try { await OrbitGroups.addSettlement(sid, s); }
+    catch (e) { console.warn('[Phase D] shared settlement write failed', e); }
   }
   function tabSettleGroup(g) {
     const mat = computeGroupMatrix(g.id);
@@ -1675,6 +1821,12 @@
     return card;
   }
   function formRow(label, control) {
+    // Associate the <label> with its control for screen readers: give the
+    // control an id (if it doesn't have one) and point the label's `for` at it.
+    if (control && control.setAttribute) {
+      if (!control.id) control.id = 'fld-' + Math.random().toString(36).slice(2, 8);
+      return h('div', { class: 'form-row' }, [h('label', { for: control.id }, label), control]);
+    }
     return h('div', { class: 'form-row' }, [h('label', {}, label), control]);
   }
   function selectInput(opts, current, onChange) {
@@ -1794,7 +1946,7 @@
       const rows = sortRows(filtered, sortState, {
         date: (e) => e.date, group: (e) => groupById(e.groupId)?.name || '',
         title: (e) => e.title, category: (e) => e.category,
-        amount: (e) => e.amount, paidBy: (e) => userNameFull(e.paidBy),
+        amount: (e) => e.amount, paidBy: (e) => payerLabel(e),
         myShare: (e) => (e.splits.find((s) => s.userId === State.selfId) || {}).amount || 0
       });
 
@@ -1853,9 +2005,9 @@
           h('div', {}, [h('div', { class: 'title' }, e.title), e.note ? h('div', { class: 'note' }, e.note) : null])
         ])));
         tr2.appendChild(h('td', {}, h('span', { class: 'cat cat-' + e.category }, categoryLabel(e.category))));
-        tr2.appendChild(h('td', {}, h('span', { class: 'who' }, [avatar(e.paidBy, 'sm'), userName(e.paidBy)])));
+        tr2.appendChild(h('td', {}, h('span', { class: 'who' }, [avatar(firstPayerId(e), 'sm'), payerLabel(e)])));
         tr2.appendChild(h('td', { class: 'col-amt' }, fmtMoney(e.amount, e.currency)));
-        tr2.appendChild(h('td', { class: 'col-amt ' + (e.paidBy === State.selfId ? 'pos' : 'neg') }, fmtMoney(myShare, e.currency)));
+        tr2.appendChild(h('td', { class: 'col-amt ' + ((paidByUser(e, State.selfId) - myShare) >= 0 ? 'pos' : 'neg') }, fmtMoney(myShare, e.currency)));
         tr2.appendChild(h('td', { class: 'col-actions' }, [
           h('button', { title: 'Edit', onClick: (ev) => { ev.stopPropagation(); openExpenseModal({ existing: e }); } }, '✎'),
           h('button', { title: 'Delete', onClick: (ev) => { ev.stopPropagation(); confirmDeleteExpense(e); } }, '✕')
@@ -1905,6 +2057,15 @@
       }
     });
   }
+  // CSV cell: quote + escape, AND neutralize spreadsheet formula injection.
+  // A cell starting with = + - @ (or tab/CR) is treated as a formula by Excel/
+  // Sheets; since titles/names/notes are user- and co-member-controlled, prefix
+  // a single quote so the value is rendered as inert text.
+  function csvCell(v) {
+    let s = String(v == null ? '' : v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
   function exportCsv() {
     const filtered = filterExpenses(State.expenses, State.filters.expenses);
     const head = ['Date','Group','Description','Category','Currency','Total','Paid by','Your share','Note'];
@@ -1914,14 +2075,14 @@
       const myShare = (e.splits.find((s) => s.userId === State.selfId) || {}).amount || 0;
       const row = [
         new Date(e.date).toISOString().slice(0,10),
-        '"' + (g?.name || '').replace(/"/g, '""') + '"',
-        '"' + e.title.replace(/"/g, '""') + '"',
+        csvCell(g?.name || ''),
+        csvCell(e.title),
         categoryLabel(e.category),
         e.currency,
         e.amount.toFixed(2),
-        '"' + userNameFull(e.paidBy).replace(/"/g, '""') + '"',
+        csvCell(payerLabel(e)),
         myShare.toFixed(2),
-        '"' + (e.note || '').replace(/"/g, '""') + '"'
+        csvCell(e.note || '')
       ];
       lines.push(row.join(','));
     });
@@ -2033,7 +2194,7 @@
 
     // Top spenders (who paid most)
     const paidByMap = {};
-    exps.forEach((e) => { paidByMap[e.paidBy] = (paidByMap[e.paidBy] || 0) + e.amount; });
+    exps.forEach((e) => { expensePayers(e).forEach((p) => { paidByMap[p.userId] = (paidByMap[p.userId] || 0) + p.amount; }); });
     const topSpenders = Object.entries(paidByMap).sort((a, b) => b[1] - a[1]);
 
     // Settle preview from group matrix
@@ -2342,12 +2503,10 @@
     let owedByYou = 0; // what you owe from others' payments
     monthExps.forEach((e) => {
       const my = myShareIn(e);
-      if (e.paidBy === State.selfId) {
-        paidOut += e.amount;
-        owedToYou += (e.amount - my);
-      } else if (my > 0) {
-        owedByYou += my;
-      }
+      const paidSelf = paidByUser(e, State.selfId);
+      paidOut += paidSelf;
+      const net = paidSelf - my;
+      if (net > 0) owedToYou += net; else owedByYou += -net;
     });
     const myShareMonth = total;
     const ratio = (paidOut + myShareMonth) > 0 ? paidOut / (paidOut + myShareMonth) : 0;
@@ -2475,11 +2634,11 @@
           h('div', { class: 'feed-icon' }, '₹'),
           h('div', {}, [
             h('div', { class: 'title' }, [e.title, recurBadge]),
-            h('div', { class: 'meta' }, [userNameFull(e.paidBy) + ' paid · ', g?.name || '—', ' · ', fmtDateTime(e.date)])
+            h('div', { class: 'meta' }, [payerLabel(e) + ' paid · ', g?.name || '—', ' · ', fmtDateTime(e.date)])
           ]),
           h('div', { style: { textAlign: 'right' } }, [
             h('div', { class: 'amt' }, fmtMoney(e.amount, e.currency)),
-            h('div', { class: 'small ' + (e.paidBy === State.selfId ? 'muted' : '') }, e.paidBy === State.selfId ? '+' + fmtMoney(e.amount - myShare, e.currency) : '−' + fmtMoney(myShare, e.currency))
+            (() => { const net = paidByUser(e, State.selfId) - myShare; return h('div', { class: 'small ' + (net >= 0 ? 'muted' : '') }, net >= 0 ? '+' + fmtMoney(net, e.currency) : '−' + fmtMoney(-net, e.currency)); })()
           ])
         ]));
       } else {
@@ -2650,7 +2809,7 @@
       const cur = e.currency || 'INR';
       byCur[cur] = byCur[cur] || {};
       const net = byCur[cur];
-      net[e.paidBy] = (net[e.paidBy] || 0) + e.amount;
+      expensePayers(e).forEach((p) => { net[p.userId] = (net[p.userId] || 0) + p.amount; });
       e.splits.forEach((s) => { net[s.userId] = (net[s.userId] || 0) - s.amount; });
     });
     State.settlements.forEach((s) => {
@@ -2700,7 +2859,7 @@
             }, remRecent ? 'Reminded' : 'Remind') : null,
             !isOwed && otherU?.upi ? h('button', { class: 'btn-pay', onClick: () => payViaUPI(otherU, t.amount) }, 'Pay via UPI') : null,
             otherU ? h('button', { class: 'btn-wa', title: 'Message on WhatsApp', onClick: () => remindViaWhatsApp(otherU, t.amount, isOwed ? 'owes-you' : 'you-owe') }, waIcon()) : null,
-            h('button', { class: 'btn-mark', onClick: () => recordSettlement(t.groupId || '', t.from, t.to, t.amount, cur) }, 'Mark paid')
+            h('button', { class: 'btn-mark', onClick: (ev) => { ev.currentTarget.disabled = true; recordSettlementSmart(t.from, t.to, t.amount, cur); } }, 'Mark paid')
           ])
         ]));
       });
@@ -2889,7 +3048,7 @@
         category: categoryLabel(e.category),
         currency: e.currency,
         amount: e.amount,
-        paidBy: u(e.paidBy)?.name || 'Unknown',
+        paidBy: payerLabel(e),
         splits: (e.splits || []).map((s) => ({ user: u(s.userId)?.name || 'Unknown', amount: s.amount })),
         note: e.note || ''
       }));
@@ -2903,12 +3062,15 @@
         amount: s.amount, currency: s.currency,
         method: s.method || 'manual', note: s.note || ''
       }));
-    const pair = computePairBalances(State.selfId);
-    const balances = Object.entries(pair).map(([uid, amt]) => ({
-      otherName: u(uid)?.name || 'Unknown',
-      amount: amt,
-      currency: 'INR'
-    }));
+    // Per-currency balances so ₹ and € are never summed into one number.
+    const currencies = Array.from(new Set(State.expenses.map((e) => e.currency || 'INR')));
+    const balances = [];
+    currencies.forEach((cur) => {
+      const pair = computePairBalances(State.selfId, null, cur);
+      Object.entries(pair).forEach(([uid, amt]) => {
+        balances.push({ otherName: u(uid)?.name || 'Unknown', amount: amt, currency: cur });
+      });
+    });
     const me = u(State.selfId);
     return {
       meta: { exportedAt: new Date().toISOString(), exporterName: me?.name || '' },
@@ -3265,18 +3427,60 @@
   // ===================================================================
   // MODALS
   // ===================================================================
+  let _modalReturnFocus = null;
+  let _modalKeydown = null;
   function closeModal() {
     const root = $('#modalRoot');
+    if (_modalKeydown) { document.removeEventListener('keydown', _modalKeydown, true); _modalKeydown = null; }
     root.innerHTML = '';
     document.body.style.overflow = '';
+    const app = $('#app');
+    if (app) { app.removeAttribute('aria-hidden'); app.removeAttribute('inert'); }
+    // Restore focus to whatever opened the modal (keyboard users land back where
+    // they were instead of on <body>).
+    if (_modalReturnFocus && document.contains(_modalReturnFocus)) { try { _modalReturnFocus.focus(); } catch (_) {} }
+    _modalReturnFocus = null;
   }
   function openModal(content) {
     const root = $('#modalRoot');
+    _modalReturnFocus = document.activeElement;
     root.innerHTML = '';
+    // Dialog semantics so AT announces it as a modal and labels it by its heading.
+    content.setAttribute('role', 'dialog');
+    content.setAttribute('aria-modal', 'true');
+    const head = content.querySelector('h1,h2,h3');
+    if (head) {
+      if (!head.id) head.id = 'modal-title-' + Math.random().toString(36).slice(2, 7);
+      content.setAttribute('aria-labelledby', head.id);
+    }
     const backdrop = h('div', { class: 'modal-backdrop', onClick: (e) => { if (e.target === backdrop) closeModal(); } });
     backdrop.appendChild(content);
     root.appendChild(backdrop);
     document.body.style.overflow = 'hidden';
+    // Make the rest of the page inert so Tab can't escape behind the modal.
+    const app = $('#app');
+    if (app) { app.setAttribute('aria-hidden', 'true'); app.setAttribute('inert', ''); }
+
+    const focusables = () => Array.from(content.querySelectorAll(
+      'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+    )).filter((el) => el.offsetParent !== null || el === document.activeElement);
+    // Trap Tab; handle Escape here (capture phase) so it works even while typing
+    // in a field — the global shortcut handler used to swallow it.
+    _modalKeydown = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeModal(); return; }
+      if (e.key !== 'Tab') return;
+      const f = focusables();
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', _modalKeydown, true);
+    // Initial focus: first field, else first focusable, else the dialog.
+    setTimeout(() => {
+      const target = content.querySelector('input,textarea,select') || focusables()[0] || content;
+      if (target && target.focus) { try { target.focus(); } catch (_) {} }
+    }, 30);
   }
   function openGeminiKeyModal() {
     return new Promise((resolve) => {
@@ -3848,6 +4052,10 @@
     const data = { ...initial };
     if (data.date && data.date.length > 10) data.date = toDateInput(data.date);
     if (!Array.isArray(data.splits)) data.splits = [];
+    // Editing an expense that already has multiple payers → open in multi mode.
+    if (Array.isArray(data.payers) && data.payers.length > 1) { data.paidBy = '__multi'; data.payers = data.payers.map((p) => ({ ...p })); }
+    else data.payers = null;
+    const multiActive = () => data.paidBy === '__multi';
     let selectedMembers = data.splits.length ? data.splits.map((s) => s.userId) : (groupById(data.groupId)?.members || []).slice();
 
     function currentGroup() { return groupById(data.groupId); }
@@ -3953,7 +4161,10 @@
       refreshFxHint();
     } });
     State.groups.forEach((g) => { const op = h('option', { value: g.id }, g.name); if (g.id === data.groupId) op.selected = true; grpSel.appendChild(op); });
-    const paidSel = h('select', { class: 'select', onChange: (e) => { data.paidBy = e.target.value; } });
+    const paidSel = h('select', { class: 'select', onChange: (e) => {
+      if (e.target.value === '__multi') { data.paidBy = '__multi'; payersWrap.style.display = ''; renderPayers(); }
+      else { data.paidBy = e.target.value; data.payers = null; payersWrap.style.display = 'none'; }
+    } });
     function refreshPaidBy() {
       paidSel.innerHTML = '';
       const g = currentGroup();
@@ -3964,9 +4175,48 @@
         if (mid === data.paidBy) op.selected = true;
         paidSel.appendChild(op);
       });
+      // Multiple-payer option (e.g. you + a friend each paid part of the bill).
+      const mop = h('option', { value: '__multi' }, 'Multiple people…');
+      if (multiActive()) mop.selected = true;
+      paidSel.appendChild(mop);
     }
     refreshPaidBy();
-    grpSel.addEventListener('change', refreshPaidBy);
+
+    // Per-member "who paid how much" panel — shown only in multi-payer mode.
+    const payersWrap = h('div', { class: 'payers-wrap', style: { display: multiActive() ? '' : 'none' } });
+    function renderPayers() {
+      payersWrap.innerHTML = '';
+      const members = (currentGroup()?.members) || [];
+      if (!Array.isArray(data.payers)) data.payers = [];
+      payersWrap.appendChild(h('div', { class: 'small muted', style: { margin: '2px 0 6px' } }, 'How much did each person pay?'));
+      const hint = h('div', { class: 'small muted', style: { marginTop: '4px' } }, '');
+      function updatePayHint() {
+        const sum = (data.payers || []).reduce((s, p) => s + (p.amount || 0), 0);
+        hint.textContent = 'Paid: ' + fmtMoney(sum, data.currency) + ' / ' + fmtMoney(data.amount || 0, data.currency);
+        hint.style.color = Math.abs(sum - (data.amount || 0)) < 0.05 ? 'var(--positive)' : 'var(--text-3)';
+      }
+      members.forEach((mid) => {
+        const u = State.users.find((x) => x.id === mid); if (!u) return;
+        const cur = data.payers.find((p) => p.userId === mid);
+        const inp = h('input', { class: 'input', type: 'number', step: '0.01', min: '0', value: cur ? cur.amount : '', placeholder: '0.00', style: { width: '120px' } });
+        inp.addEventListener('input', (e) => {
+          const v = parseFloat(e.target.value) || 0;
+          const ex = data.payers.find((p) => p.userId === mid);
+          if (ex) ex.amount = v; else data.payers.push({ userId: mid, amount: v });
+          updatePayHint();
+        });
+        payersWrap.appendChild(h('div', { class: 'member-row' }, [
+          avatar(mid, 'sm'),
+          h('span', { class: 'name' }, u.name + (u.isSelf ? ' (you)' : '')),
+          h('div', { class: 'share-input' }, inp)
+        ]));
+      });
+      payersWrap.appendChild(hint);
+      updatePayHint();
+    }
+    if (multiActive()) renderPayers();
+    // Keep paid-by options + payer panel in sync when the group changes.
+    grpSel.addEventListener('change', () => { refreshPaidBy(); if (multiActive()) renderPayers(); });
 
     const catSel = h('select', { class: 'select', onChange: (e) => { data.category = e.target.value; } });
     CATEGORIES.forEach((c) => { const op = h('option', { value: c.id }, c.label); if (c.id === data.category) op.selected = true; catSel.appendChild(op); });
@@ -3976,6 +4226,7 @@
       formRow('Paid by', paidSel),
       formRow('Category', catSel)
     ]));
+    body.appendChild(payersWrap);
 
     // Split mode tabs
     const splitSeg = h('div', { class: 'seg' }, [
@@ -4000,11 +4251,20 @@
       const isChecked = selectedMembers.includes(mid);
       const split = data.splits.find((s) => s.userId === mid);
       const row = h('div', { class: 'member-row' + (isChecked ? ' checked' : '') });
-      row.appendChild(h('span', { class: 'cb', onClick: () => {
-        if (isChecked) selectedMembers = selectedMembers.filter((x) => x !== mid);
+      const toggle = () => {
+        if (selectedMembers.includes(mid)) selectedMembers = selectedMembers.filter((x) => x !== mid);
         else selectedMembers.push(mid);
         renderMemberList();
-      } }, isChecked ? '✓' : ''));
+      };
+      row.appendChild(h('span', {
+        class: 'cb',
+        role: 'checkbox',
+        tabindex: '0',
+        'aria-checked': isChecked ? 'true' : 'false',
+        'aria-label': 'Split with ' + u.name + (u.isSelf ? ' (you)' : ''),
+        onClick: toggle,
+        onKeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }
+      }, isChecked ? '✓' : ''));
       row.appendChild(avatar(mid, 'sm'));
       row.appendChild(h('span', { class: 'name' }, u.name + (u.isSelf ? ' (you)' : '')));
       if (data.splitMode === 'equal') {
@@ -4085,19 +4345,25 @@
 
     async function saveExpense() {
       if (!data.title.trim()) { toast('Description required', 'neg'); return; }
-      if (!(data.amount > 0)) { toast('Amount must be > 0', 'neg'); return; }
+      if (!isFinite(data.amount) || data.amount <= 0) { toast('Enter a valid amount greater than 0', 'neg'); return; }
+      if (data.amount > 1e12) { toast('Amount is too large', 'neg'); return; }
       if (!data.groupId) { toast('Pick a group', 'neg'); return; }
       if (selectedMembers.length === 0) { toast('Pick at least one member', 'neg'); return; }
+      // Reject negative exact/percent/share inputs (a negative split is never valid).
+      if (data.splitMode !== 'equal') {
+        const bad = data.splits.filter((s) => selectedMembers.includes(s.userId)).some((s) => s.amount < 0);
+        if (bad) { toast('Split values cannot be negative', 'neg'); return; }
+      }
 
-      // Build splits according to mode
+      // Build splits according to mode. EVERY mode reconciles its rounding
+      // residual onto the last split so sum(splits) === amount to the paisa —
+      // otherwise the group ledger never nets to zero (a phantom 0.01 lingers).
       let splits = [];
       if (data.splitMode === 'equal') {
         const per = Math.round((data.amount / selectedMembers.length) * 100) / 100;
         splits = selectedMembers.map((uid2) => ({ userId: uid2, amount: per }));
-        const sum = splits.reduce((s, x) => s + x.amount, 0);
-        if (splits.length) splits[splits.length - 1].amount = Math.round((splits[splits.length - 1].amount + (data.amount - sum)) * 100) / 100;
       } else if (data.splitMode === 'exact') {
-        splits = data.splits.filter((s) => selectedMembers.includes(s.userId));
+        splits = data.splits.filter((s) => selectedMembers.includes(s.userId)).map((s) => ({ userId: s.userId, amount: s.amount }));
         const sum = splits.reduce((s, x) => s + x.amount, 0);
         if (Math.abs(sum - data.amount) > 0.05) { toast('Exact splits must sum to ' + fmtMoney(data.amount, data.currency), 'neg'); return; }
       } else if (data.splitMode === 'percent') {
@@ -4111,6 +4377,24 @@
         if (totalShares <= 0) { toast('Provide share counts', 'neg'); return; }
         splits = items.map((s) => ({ userId: s.userId, amount: Math.round((data.amount * s.amount / totalShares) * 100) / 100 }));
       }
+      reconcileSplits(splits, data.amount);
+
+      // Resolve payer(s). Single payer → just data.paidBy. Multiple payers →
+      // validate the entered amounts add up to the total, reconcile the rounding
+      // residual, and store a `payers` array. paidBy is set to the largest payer
+      // so legacy/display code that reads a single paidBy still works.
+      let payers = null;
+      let paidBy = data.paidBy;
+      if (data.paidBy === '__multi') {
+        payers = (data.payers || []).filter((p) => p.amount > 0).map((p) => ({ userId: p.userId, amount: Math.round(p.amount * 100) / 100 }));
+        if (!payers.length) { toast('Enter how much each person paid', 'neg'); return; }
+        if (payers.some((p) => p.amount < 0)) { toast('Payments cannot be negative', 'neg'); return; }
+        const psum = payers.reduce((s, p) => s + p.amount, 0);
+        if (Math.abs(psum - data.amount) > 0.05) { toast('Payments must add up to ' + fmtMoney(data.amount, data.currency), 'neg'); return; }
+        reconcileSplits(payers, data.amount);
+        payers.sort((a, b) => b.amount - a.amount);
+        paidBy = payers[0].userId;
+      }
 
       const obj = {
         id: existing?.id || uid('e'),
@@ -4118,13 +4402,14 @@
         title: data.title.trim(),
         amount: data.amount,
         currency: data.currency,
-        paidBy: data.paidBy,
+        paidBy,
         splitMode: data.splitMode,
         splits,
         category: data.category,
         date: dateFromInput(data.date),
         note: data.note || ''
       };
+      if (payers) obj.payers = payers;
       if (data.recurring && data.recurring.freq) {
         const anchor = data.recurring.anchorDate || obj.date;
         obj.recurring = {
@@ -4178,9 +4463,15 @@
     const inp = $('#globalSearch');
     inp.addEventListener('input', (e) => {
       const q = e.target.value.trim();
+      State.filters.expenses.q = q;
+      // Search is global: from any screen, typing routes to Expenses (the
+      // searchable list) and applies the filter, so it never silently no-ops.
       if (State.route.name === 'expenses') {
-        State.filters.expenses.q = q;
         render();
+      } else if (q) {
+        navigate('#/expenses');
+        // keep focus + caret in the search box after the route re-render
+        setTimeout(() => { const s = $('#globalSearch'); if (s) { s.focus(); s.value = q; } }, 0);
       }
     });
     document.addEventListener('keydown', (e) => {
@@ -4981,4 +5272,13 @@
 
   window.addEventListener('DOMContentLoaded', boot);
   window.OrbitApp = { State, render };
+  // Test hook (pure money/logic functions) — used by the headless QA harness to
+  // unit-test the real implementations rather than a reimplementation. Safe to
+  // ship: read-only helpers, no secrets.
+  window.OrbitApp.__test = {
+    computePairBalances, computeNetByCurrency, simplifyDebts, reconcileSplits,
+    totalOwedToYou, totalYouOwe, allocateSettlement, recordSettlement,
+    recordSettlementSmart, computeGroupMatrix, csvCell,
+    expensePayers, paidByUser, payerLabel
+  };
 })();

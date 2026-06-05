@@ -233,12 +233,19 @@ export const claimPending = onCall({ region: REGION }, async (request) => {
         tx.update(groupRef, groupUpdate);
 
         expSnap.forEach((d) => {
-          const e = d.data(); let changed = false;
-          if (e.paidBy === ghostId) { e.paidBy = uid; changed = true; }
+          const e = d.data(); let changed = false; const upd = {};
+          if (e.paidBy === ghostId) { e.paidBy = uid; upd.paidBy = uid; changed = true; }
           if (Array.isArray(e.splits)) {
             e.splits = e.splits.map((s) => (s && s.userId === ghostId ? (changed = true, { ...s, userId: uid }) : s));
+            if (changed) upd.splits = e.splits;
           }
-          if (changed) tx.update(d.ref, { paidBy: e.paidBy, splits: e.splits });
+          // Multi-payer expenses also carry a payers[] array — relabel it too.
+          if (Array.isArray(e.payers)) {
+            let pchanged = false;
+            const np = e.payers.map((p) => (p && p.userId === ghostId ? (pchanged = true, { ...p, userId: uid }) : p));
+            if (pchanged) { upd.payers = np; changed = true; }
+          }
+          if (changed) tx.update(d.ref, upd);
         });
         setSnap.forEach((d) => {
           const s = d.data(); const upd = {};

@@ -154,11 +154,24 @@
     doc.save(fname);
   }
 
+  // Neutralize spreadsheet formula injection: any STRING cell beginning with
+  // = + - @ (or tab/CR) is prefixed with a single quote so Excel/Sheets render
+  // it as inert text. Numbers pass through untouched. Titles, names, and notes
+  // are user/co-member-controlled, so this must run on every exported AOA.
+  function safeCell(v) {
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(v)) return "'" + v;
+    return v;
+  }
+  function sanitizeAOA(rows) {
+    return rows.map((r) => (Array.isArray(r) ? r.map(safeCell) : r));
+  }
+
   // -------------------- XLSX --------------------
   async function downloadXLSX(payload, opts = {}) {
     await loadXLSX();
     const XLSX = window.XLSX;
     const wb = XLSX.utils.book_new();
+    const sheet = (rows) => XLSX.utils.aoa_to_sheet(sanitizeAOA(rows));
 
     // Sheet 1: Summary
     const balances = payload.balances || [];
@@ -171,14 +184,14 @@
       ['Person', 'Net amount', 'Currency'],
       ...balances.map((b) => [b.otherName || '—', Number(b.amount || 0), b.currency || ''])
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
+    XLSX.utils.book_append_sheet(wb, sheet(summary), 'Summary');
 
     // Sheet 2: Groups
     const groupRows = [
       ['Group ID', 'Name', 'Currency', 'Members'],
       ...payload.groups.map((g) => [g.id, g.name, g.currency, g.members.map((m) => m.name).join(', ')])
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(groupRows), 'Groups');
+    XLSX.utils.book_append_sheet(wb, sheet(groupRows), 'Groups');
 
     // Sheet 3: Expenses
     const expRows = [
@@ -189,7 +202,7 @@
         e.note || ''
       ])
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expRows), 'Expenses');
+    XLSX.utils.book_append_sheet(wb, sheet(expRows), 'Expenses');
 
     // Sheet 4: Settlements
     const setRows = [
@@ -198,7 +211,7 @@
         fmtDate(s.date), s.group, s.fromUser, s.toUser, s.amount, s.currency, s.method || 'manual', s.note || ''
       ])
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(setRows), 'Settlements');
+    XLSX.utils.book_append_sheet(wb, sheet(setRows), 'Settlements');
 
     const fname = (opts.filename || 'orbit-' + fmtDate(payload.meta.exportedAt) + '.xlsx');
     XLSX.writeFile(wb, fname);
