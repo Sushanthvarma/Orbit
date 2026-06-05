@@ -1,5 +1,5 @@
 /* Orbit Web — service worker (offline cache) */
-const CACHE = 'orbit-web-v49';
+const CACHE = 'orbit-web-v50';
 // Only precache assets the page actually requests at the exact URL.
 // JS/CSS are versioned via `?v=` query, so they're fetched live on first
 // load and then cache-first on repeat visits via the fetch handler below.

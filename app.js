@@ -576,7 +576,7 @@
   function renderSidebarGroups() {
     const root = $('#sidebarGroups');
     root.innerHTML = '';
-    const groups = State.groups.slice().sort((a, b) => {
+    const groups = State.groups.filter((g) => !g.archived).sort((a, b) => {
       // by most-recent activity desc
       const lastA = lastActivityDate(a.id);
       const lastB = lastActivityDate(b.id);
@@ -1393,7 +1393,7 @@
 
     function renderGrid() {
       grid.innerHTML = '';
-      let groups = State.groups.slice();
+      let groups = State.groups.filter((g) => !g.archived);
       if (q) groups = groups.filter((g) => g.name.toLowerCase().includes(q));
       if (cat) groups = groups.filter((g) => g.category === cat);
       groups.sort((a, b) => (lastActivityDate(b.id) || '').localeCompare(lastActivityDate(a.id) || ''));
@@ -1481,7 +1481,14 @@
       h('div', { class: 'actions' }, [
         h('button', { class: 'btn btn-ghost btn-sm', onClick: () => inviteToGroup(g) }, 'Invite'),
         h('button', { class: 'btn btn-ghost btn-sm', onClick: () => openConfirmModal({
-          title: 'Archive group?', bodyHtml: 'You can restore later. Existing expenses stay.', confirmText: 'Archive', onConfirm: async () => { toast('Archived (demo)'); } }) }, 'Archive'),
+          title: 'Archive group?', bodyHtml: 'It’ll be hidden from your groups list. Existing expenses stay, and you can unarchive it from Settings.', confirmText: 'Archive', onConfirm: async () => {
+            g.archived = true;
+            await OrbitDB.put('groups', g);
+            State.groups = State.groups.map((x) => x.id === g.id ? g : x);
+            renderSidebarGroups();
+            toast('Archived “' + g.name + '”', 'pos');
+            navigate('#/groups');
+          } }) }, 'Archive'),
         h('button', { class: 'btn btn-primary btn-sm', onClick: () => openExpenseModal({ groupId: g.id }) }, '+ Add expense')
       ])
     ]);
@@ -1778,25 +1785,47 @@
     });
   }
   async function doRemoveMember(g, mid, name) {
+    // Remove from the LOCAL roster FIRST so the chip disappears immediately and
+    // normalizeSharedGroup() won't re-add it as a "local-only" member. This is
+    // the fix for "Removed X" toasting but the member staying — without it, a
+    // ghost / name-only member is removed from the cloud yet re-derived from the
+    // local roster on the next realtime snapshot, so it never actually leaves.
+    const removeLocal = () => {
+      g.members = g.members.filter((x) => x !== mid);
+      g.memberCount = g.members.length;
+      State.groups = State.groups.map((x) => x.id === g.id ? g : x);
+    };
+    const restoreLocal = () => {
+      if (!g.members.includes(mid)) g.members.push(mid);
+      g.memberCount = g.members.length;
+      State.groups = State.groups.map((x) => x.id === g.id ? g : x);
+    };
+
+    removeLocal();
+    await OrbitDB.put('groups', g);
+    render();
+
+    // Mirror to the cloud for shared groups so every member sees the removal.
     if (isSharedGroup(g)) {
-      if (!window.OrbitGroups || !OrbitGroups.isReady()) { toast('Sign in to manage this shared group', 'neg'); return; }
+      if (!window.OrbitGroups || !OrbitGroups.isReady()) {
+        restoreLocal(); await OrbitDB.put('groups', g); render();
+        toast('Sign in to manage this shared group', 'neg');
+        return;
+      }
       try {
         await OrbitGroups.removeMember(sharedIdOf(g), mid);
-        toast('Removed ' + name, 'pos');
-        // The onMyGroups listener reflects the new roster; no local mutation.
       } catch (e) {
+        console.warn('[group] removeMember (cloud) failed', e);
+        restoreLocal(); await OrbitDB.put('groups', g); render();
         toast('Couldn’t remove ' + name + ': ' + (e.message || e.code || 'error'), 'neg');
-        console.warn('[group] removeMember failed', e);
+        return;
       }
-      return;
     }
-    g.members = g.members.filter((x) => x !== mid);
-    await OrbitDB.put('groups', g);
+
     if (window.OrbitActivity) await OrbitActivity.log(OrbitDB, {
       actorId: State.selfId, action: 'remove', entityType: 'member',
       entityId: mid, groupId: g.id, snapshot: { title: 'Removed ' + name }
     });
-    render();
     toast('Removed ' + name, 'pos');
   }
   function tabSettings(g) {
@@ -1809,8 +1838,20 @@
     ], g.category, async (v) => { g.category = v; await OrbitDB.put('groups', g); toast('Saved'); })));
     body.appendChild(formRow('Currency', selectInput([
       { v: 'INR', l: '₹ INR' }, { v: 'EUR', l: '€ EUR' }, { v: 'USD', l: '$ USD' }, { v: 'GBP', l: '£ GBP' }
-    ], g.currency, async (v) => { g.currency = v; await OrbitDB.put('groups', g); toast('Saved'); })));
+    ], g.currency, async (v) => { g.currency = v; await OrbitDB.put('groups', g); toast('Saved'); render(); })));
     body.appendChild(h('hr'));
+    // Unarchive control (only shown for an archived group, reachable via direct
+    // link) so the "you can unarchive from Settings" promise is real.
+    if (g.archived) {
+      body.appendChild(h('div', { class: 'btn-row', style: { marginBottom: 'var(--s-3)' } }, [
+        h('button', { class: 'btn btn-sm', onClick: async () => {
+          delete g.archived;
+          await OrbitDB.put('groups', g);
+          State.groups = State.groups.map((x) => x.id === g.id ? g : x);
+          renderSidebarGroups(); toast('Unarchived “' + g.name + '”', 'pos'); render();
+        } }, 'Unarchive group')
+      ]));
+    }
     // Owner model: the creator owns the group and can delete it; a member who
     // joined can only LEAVE (the group stays for everyone else).
     const danger = (isSharedGroup(g) && !isGroupOwner(g))
@@ -2948,7 +2989,7 @@
     cPrefBody.appendChild(formRow('Primary UPI VPA', h('input', { class: 'input mono', value: me.upi || '', placeholder: 'you@bank', onChange: async (e) => { me.upi = e.target.value.trim(); await OrbitDB.put('users', me); renderMeCard(); toast('UPI VPA saved'); } })));
     cPrefBody.appendChild(formRow('Default currency', selectInput([
       { v: 'INR', l: '₹ INR' }, { v: 'EUR', l: '€ EUR' }, { v: 'USD', l: '$ USD' }, { v: 'GBP', l: '£ GBP' }
-    ], 'INR', () => toast('Saved'))));
+    ], me.defaultCurrency || 'INR', async (v) => { me.defaultCurrency = v; await OrbitDB.put('users', me); toast('Saved'); })));
     // Cream-light is the only theme — toggle removed.
     cPref.appendChild(cPrefBody);
     grid.appendChild(cPref);
@@ -3559,8 +3600,14 @@
   }
 
   // ---- New group modal ----
+  // The signed-in user's saved default currency (Profile → preferences), used
+  // to pre-select the currency on new groups/expenses. Falls back to INR.
+  function selfDefaultCurrency() {
+    const me = State.users.find((u) => u.isSelf);
+    return (me && me.defaultCurrency) || 'INR';
+  }
   function openNewGroup() {
-    const data = { name: '', category: 'friends', currency: 'INR', members: [State.selfId], newMember: '', shared: false };
+    const data = { name: '', category: 'friends', currency: selfDefaultCurrency(), members: [State.selfId], newMember: '', shared: false };
     const modal = h('div', { class: 'modal modal-lg' });
     modal.appendChild(h('div', { class: 'modal-head' }, [h('h2', {}, 'Create a group'), h('button', { class: 'close', onClick: closeModal }, '×')]));
     const body = h('div', { class: 'modal-body' });
@@ -3850,6 +3897,14 @@
           }
         }
         closeModal();
+        // Re-sync State from the persisted store BEFORE rendering. The global
+        // OrbitDB.on('*') listener reloads State asynchronously and can race the
+        // render below, intermittently dropping the just-added member chip.
+        // Awaiting the authoritative read here makes the new chip render reliably.
+        try {
+          State.users = await OrbitDB.getAll('users');
+          State.groups = await OrbitDB.getAll('groups');
+        } catch (_) {}
         if (addedDirectly) {
           toast('Added ' + nm + ' — they’re in the group', 'pos');
         } else if (needsInvite) {
@@ -4041,7 +4096,7 @@
       groupId: groupId || State.groups[0]?.id || '',
       title: '',
       amount: 0,
-      currency: 'INR',
+      currency: selfDefaultCurrency(),
       paidBy: State.selfId,
       splitMode: 'equal',
       splits: [],
@@ -5279,6 +5334,6 @@
     computePairBalances, computeNetByCurrency, simplifyDebts, reconcileSplits,
     totalOwedToYou, totalYouOwe, allocateSettlement, recordSettlement,
     recordSettlementSmart, computeGroupMatrix, csvCell,
-    expensePayers, paidByUser, payerLabel
+    expensePayers, paidByUser, payerLabel, isSharedGroup
   };
 })();

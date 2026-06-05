@@ -158,10 +158,25 @@ export const removeMember = onCall({ region: REGION }, async (request) => {
     const inMap = !!(group.members && group.members[memberUid]);
     if (!inRoster && !inMap) return; // nothing to remove — idempotent
 
-    const removedName = (group.members && group.members[memberUid] && group.members[memberUid].name) || 'A member';
+    const memberInfo = (group.members && group.members[memberUid]) || {};
+    const removedName = memberInfo.name || 'A member';
     const updates = { [`members.${memberUid}`]: FieldValue.delete() };
     if (inRoster) updates.memberUids = FieldValue.arrayRemove(memberUid);
     tx.update(groupRef, updates);
+
+    // If this was a GHOST (invited by email/phone, not yet joined), delete the
+    // pending claim ticket(s) for it — otherwise claimPending() would silently
+    // re-add the removed person to the group the moment they sign in.
+    const handles = [];
+    if (memberInfo.email) handles.push(String(memberInfo.email).trim().toLowerCase());
+    if (memberInfo.phone) {
+      let ph = String(memberInfo.phone).replace(/[^\d+]/g, '');
+      if (ph && !ph.startsWith('+') && ph.length === 10) ph = '+91' + ph;
+      if (ph) handles.push(ph);
+    }
+    for (const handle of handles) {
+      tx.delete(db.doc(`pendingClaims/${handle}/tickets/${memberUid}__${groupId}`));
+    }
 
     // Persistent "X was removed" entry (deterministic id so a re-remove
     // never duplicates it).
