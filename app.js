@@ -2957,6 +2957,7 @@
       h('div', { class: 'actions' }, [
         h('button', { class: 'btn btn-primary btn-sm', onClick: inviteToOrbit }, 'Invite friends'),
         h('button', { class: 'btn btn-ghost btn-sm', onClick: exportAllJson }, 'Export JSON'),
+        h('button', { class: 'btn btn-ghost btn-sm', onClick: restoreFromJson }, 'Restore JSON'),
         h('button', { class: 'btn btn-danger btn-sm', onClick: confirmDeleteAll }, 'Wipe all data')
       ])
     ]));
@@ -3164,6 +3165,40 @@
     }
   }
 
+  // Restore a previously-exported JSON snapshot. Validates the file, confirms
+  // (it replaces current data), then reloads State + re-renders.
+  function restoreFromJson() {
+    const input = h('input', { type: 'file', accept: 'application/json,.json', style: { display: 'none' } });
+    input.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      let data;
+      try { data = JSON.parse(await file.text()); }
+      catch (_) { toast('That file isn’t valid JSON', 'neg'); return; }
+      openConfirmModal({
+        title: 'Restore from backup?',
+        bodyHtml: 'This <strong>replaces</strong> your current groups, expenses, settlements and activity with the contents of this file. Export a backup first if you’re unsure.',
+        confirmText: 'Restore',
+        danger: true,
+        onConfirm: async () => {
+          try {
+            const res = await OrbitDB.importAll(data);
+            await loadAll();
+            try { State.activity = await OrbitDB.getAll('activity'); } catch (_) {}
+            render();
+            const n = Object.values(res.counts || {}).reduce((s, x) => s + x, 0);
+            toast('Restored ' + n + ' records', 'pos');
+          } catch (err) {
+            console.error('[restore] failed', err);
+            toast(err.message || 'Restore failed', 'neg');
+          }
+        }
+      });
+    });
+    document.body.appendChild(input);
+    input.click();
+    setTimeout(() => { try { input.remove(); } catch (_) {} }, 10000);
+  }
   async function exportAllJson() {
     const data = await OrbitDB.exportAll();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -4180,6 +4215,9 @@
 
     async function runOcrFlow(file) {
       if (!window.OrbitOCR) { ocrStatus.textContent = 'OCR module not loaded'; return; }
+      // Validate the upload before handing a multi-MB blob to the OCR engine.
+      if (!/^image\//.test(file.type || '')) { ocrStatus.textContent = 'Please choose an image file (JPG/PNG).'; return; }
+      if (file.size > 12 * 1024 * 1024) { ocrStatus.textContent = 'Image is too large (max 12 MB). Try a smaller photo.'; return; }
       ocrStatus.textContent = 'Loading OCR engine…';
       try {
         const r = await OrbitOCR.recognize(file, {

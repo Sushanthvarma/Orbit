@@ -23,10 +23,23 @@
 
   function addInterval(iso, freq) {
     const d = new Date(iso);
-    if (freq === 'weekly')      d.setDate(d.getDate() + 7);
-    else if (freq === 'fortnightly') d.setDate(d.getDate() + 14);
-    else if (freq === 'yearly') d.setFullYear(d.getFullYear() + 1);
-    else                        d.setMonth(d.getMonth() + 1); // monthly default
+    if (freq === 'weekly') {
+      d.setDate(d.getDate() + 7);
+    } else if (freq === 'fortnightly') {
+      d.setDate(d.getDate() + 14);
+    } else if (freq === 'yearly') {
+      // Feb 29 + 1 year must land on Feb 28 (not Mar 1) in a non-leap year.
+      const day = d.getDate();
+      d.setFullYear(d.getFullYear() + 1);
+      if (d.getDate() !== day) d.setDate(0); // overflowed → clamp to last day of intended month
+    } else {
+      // Monthly. JS setMonth on a day that doesn't exist in the target month
+      // rolls FORWARD (Jan 31 + 1mo → Mar 3), silently skipping February. Clamp
+      // to the last day of the intended month instead (Jan 31 → Feb 28/29).
+      const day = d.getDate();
+      d.setMonth(d.getMonth() + 1);
+      if (d.getDate() !== day) d.setDate(0);
+    }
     return d.toISOString();
   }
 
