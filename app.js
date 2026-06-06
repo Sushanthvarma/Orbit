@@ -510,14 +510,17 @@
   // ===================================================================
   // ROUTER
   // ===================================================================
+  // decodeURIComponent throws on a malformed escape (e.g. a lone "%"); never let
+  // a hand-typed/garbled URL break routing.
+  function safeDecode(s) { try { return decodeURIComponent(s); } catch (_) { return s; } }
   function parseHash() {
     const hash = location.hash.slice(1) || '/dashboard';
     const [path, queryStr] = hash.split('?');
-    const parts = path.split('/').filter(Boolean);
+    const parts = path.split('/').filter(Boolean).map(safeDecode);
     const query = {};
     (queryStr || '').split('&').filter(Boolean).forEach((p) => {
       const [k, v] = p.split('=');
-      query[decodeURIComponent(k)] = decodeURIComponent(v || '');
+      query[safeDecode(k)] = safeDecode(v || '');
     });
     return { parts, query };
   }
@@ -528,6 +531,9 @@
     location.hash = target;
   }
   function route() {
+    // A route change should never leave a stale modal (from the previous screen)
+    // floating over the new one — close it first.
+    try { if ($('#modalRoot').children.length) closeModal(); } catch (_) {}
     const { parts, query } = parseHash();
     const [name, p1, p2] = parts;
     State.route = { name: name || 'dashboard', params: { id: p1, sub: p2 }, query };
@@ -1529,10 +1535,10 @@
     });
     page.appendChild(tabs);
 
-    if (tab === 'expenses') page.appendChild(tabExpenses(g));
-    else if (tab === 'balances') page.appendChild(tabBalances(g));
+    if (tab === 'balances') page.appendChild(tabBalances(g));
     else if (tab === 'settle') page.appendChild(tabSettleGroup(g));
-    else page.appendChild(tabSettings(g));
+    else if (tab === 'settings') page.appendChild(tabSettings(g));
+    else page.appendChild(tabExpenses(g));   // 'expenses' + any unknown tab → Expenses
 
     setMain(page);
   }
