@@ -1665,12 +1665,19 @@
   const _settleLock = new Set();
 
   async function persistSettlement(s) {
-    await OrbitDB.put('settlements', s);
+    // Settlement + its activity entry committed atomically.
+    const ops = [{ store: 'settlements', op: 'put', value: s }];
+    let actEntry = null;
+    if (window.OrbitActivity) {
+      actEntry = OrbitActivity.build({
+        actorId: State.selfId, action: 'settle', entityType: 'settlement',
+        entityId: s.id, groupId: s.groupId, snapshot: s
+      });
+      ops.push({ store: 'activity', op: 'put', value: actEntry });
+    }
+    await OrbitDB.writeTx(ops);
     State.settlements.push(s);
-    if (window.OrbitActivity) OrbitActivity.log(OrbitDB, {
-      actorId: State.selfId, action: 'settle', entityType: 'settlement',
-      entityId: s.id, groupId: s.groupId, snapshot: s
-    });
+    if (actEntry) State.activity = (State.activity || []).concat(actEntry);
     syncSettlementIfShared(s);   // mirror to Firestore when the group is shared
   }
 
@@ -2085,12 +2092,19 @@
     openConfirmModal({
       title: 'Delete expense?', bodyHtml: `<strong>${escapeHtml(e.title)}</strong> · ${escapeHtml(fmtMoney(e.amount, e.currency))}`, confirmText: 'Delete', danger: true,
       onConfirm: async () => {
-        // Log BEFORE delete so the snapshot is preserved for restore
-        if (window.OrbitActivity) await OrbitActivity.log(OrbitDB, {
-          actorId: State.selfId, action: 'delete', entityType: 'expense',
-          entityId: e.id, groupId: e.groupId, snapshot: null, prev: e
-        });
-        await OrbitDB.delete('expenses', e.id);
+        // Delete the expense AND record the "delete" activity (with the prior
+        // snapshot, so restore works) in ONE atomic transaction.
+        const ops = [{ store: 'expenses', op: 'delete', value: e.id }];
+        let actEntry = null;
+        if (window.OrbitActivity) {
+          actEntry = OrbitActivity.build({
+            actorId: State.selfId, action: 'delete', entityType: 'expense',
+            entityId: e.id, groupId: e.groupId, snapshot: null, prev: e
+          });
+          ops.push({ store: 'activity', op: 'put', value: actEntry });
+        }
+        await OrbitDB.writeTx(ops);
+        if (actEntry) State.activity = (State.activity || []).concat(actEntry);
         await syncDeleteExpenseIfShared(e);   // Phase D: mirror delete to Firestore
         State.expenses = State.expenses.filter((x) => x.id !== e.id);
         toast('Expense deleted', 'pos');
@@ -4477,19 +4491,22 @@
         };
       }
       const prevSnapshot = existing ? State.expenses.find((e) => e.id === existing.id) : null;
-      await OrbitDB.put('expenses', obj);
+      // Write the expense AND its activity entry in one atomic transaction so a
+      // crash can't save the expense while losing its history (or vice versa).
+      const ops = [{ store: 'expenses', op: 'put', value: obj }];
+      let actEntry = null;
+      if (window.OrbitActivity) {
+        actEntry = OrbitActivity.build({
+          actorId: State.selfId, action: existing ? 'edit' : 'add', entityType: 'expense',
+          entityId: obj.id, groupId: obj.groupId, snapshot: obj, prev: prevSnapshot
+        });
+        ops.push({ store: 'activity', op: 'put', value: actEntry });
+      }
+      await OrbitDB.writeTx(ops);
       if (existing) State.expenses = State.expenses.map((e) => e.id === obj.id ? obj : e);
       else State.expenses.push(obj);
+      if (actEntry) State.activity = (State.activity || []).concat(actEntry);
       await syncExpenseIfShared(obj);   // Phase D: mirror to Firestore if group is shared
-      if (window.OrbitActivity) OrbitActivity.log(OrbitDB, {
-        actorId: State.selfId,
-        action: existing ? 'edit' : 'add',
-        entityType: 'expense',
-        entityId: obj.id,
-        groupId: obj.groupId,
-        snapshot: obj,
-        prev: prevSnapshot
-      });
       closeModal();
       toast(existing ? 'Expense updated' : 'Expense added', 'pos');
       render();
@@ -4740,10 +4757,23 @@
     const origDeleteMany = OrbitDB.deleteMany.bind(OrbitDB);
     const origClear = OrbitDB.clear.bind(OrbitDB);
     const origSetMeta = OrbitDB.setMeta.bind(OrbitDB);
+    const origWriteTx = OrbitDB.writeTx.bind(OrbitDB);
 
     OrbitDB.put = async (store, obj) => {
       const r = await origPut(store, obj);
       if (OrbitCloud && OrbitCloud.user()) OrbitCloud.write(store, obj).catch((e) => console.warn('Cloud write failed', e));
+      return r;
+    };
+    // Atomic multi-store writes must mirror to the cloud too — otherwise an
+    // expense saved via writeTx (P2.1) would never reach Firestore.
+    OrbitDB.writeTx = async (ops) => {
+      const r = await origWriteTx(ops);
+      if (OrbitCloud && OrbitCloud.user()) {
+        for (const o of ops) {
+          if (o.op === 'delete') OrbitCloud.deleteOne(o.store, o.value).catch((e) => console.warn('Cloud write failed', e));
+          else OrbitCloud.write(o.store, o.value).catch((e) => console.warn('Cloud write failed', e));
+        }
+      }
       return r;
     };
     OrbitDB.putAll = async (store, items) => {

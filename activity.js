@@ -57,15 +57,17 @@
     const fields = new Set([...Object.keys(prev), ...Object.keys(next)]);
     const out = [];
     for (const k of fields) {
-      if (k === 'id' || k === 'history') continue;
+      if (k === 'id' || k === 'history' || k === 'updatedAt') continue;
       if (!eq(prev[k], next[k])) out.push({ field: k, before: prev[k], after: next[k] });
     }
     return out;
   }
 
-  async function log(OrbitDB, entry) {
-    if (!OrbitDB) return null;
-    const e = {
+  // Build a persistable activity entry WITHOUT writing it — so callers can
+  // include it in an atomic multi-store OrbitDB.writeTx alongside the entity it
+  // describes (expense/settlement), keeping the feed and the data in lock-step.
+  function build(entry) {
+    return {
       id: newId(),
       ts: new Date().toISOString(),
       actorId: entry.actorId || 'u_self',
@@ -77,6 +79,11 @@
       prev: snap(entry.prev),
       meta: entry.meta || null
     };
+  }
+
+  async function log(OrbitDB, entry) {
+    if (!OrbitDB) return null;
+    const e = build(entry);
     try { await OrbitDB.put('activity', e); } catch (err) { console.warn('Activity log failed', err); }
     return e;
   }
@@ -107,5 +114,5 @@
     })[a] || '·';
   }
 
-  global.OrbitActivity = { log, diff, snap, actionLabel, actionIcon, newId };
+  global.OrbitActivity = { log, build, diff, snap, actionLabel, actionIcon, newId };
 })(window);
