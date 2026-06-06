@@ -28,7 +28,9 @@ for(const r of routes){ logs=[]; await ev("location.hash='"+r+"'"); await sleep(
 const gids=await ev("OrbitApp.State.groups.map(g=>g.id)");
 for(const g of (gids||[])){ logs=[]; await ev("location.hash='#/groups/"+g+"'"); await sleep(500); if(logs.length) out['group '+g]=logs.slice(); }
 // open + close expense modal, settle modal — exercise modal a11y path
-logs=[]; await ev("document.querySelector('#newExpenseTop').click()"); await sleep(300);
+await ev("location.hash='#/dashboard'"); await sleep(350);
+logs=[]; out['clickResult']=await ev("(function(){try{document.querySelector('#newExpenseTop').click();return 'ok';}catch(e){return 'ERR:'+(e&&e.message);}})()"); await sleep(400);
+out['modalRootChildren']=await ev("document.querySelector('#modalRoot').children.length");
 out['modal role']=await ev("(document.querySelector('#modalRoot .modal')||{}).getAttribute&&document.querySelector('#modalRoot .modal').getAttribute('role')");
 out['app inert']=await ev("document.querySelector('#app').hasAttribute('inert')");
 await ev("document.querySelector('#modalRoot .modal-head .close').click()"); await sleep(150);

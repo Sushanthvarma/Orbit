@@ -72,6 +72,17 @@
     });
   }
 
+  // Stamp every entity write with a monotonic `updatedAt` (ms epoch). This is
+  // the version field the cloud-sync layer uses for last-write-wins conflict
+  // resolution: when two devices edit the same record, the higher updatedAt
+  // wins. Skipped for the `meta` key/value store (its values are arbitrary).
+  function stamp(store, obj) {
+    if (store !== 'meta' && obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      obj.updatedAt = Date.now();
+    }
+    return obj;
+  }
+
   const OrbitDB = {
     async init() {
       if (_db) return _db;
@@ -90,12 +101,16 @@
     },
 
     async put(store, obj) {
+      stamp(store, obj);
       await req2promise(tx(store, 'readwrite').put(obj));
       OrbitDB._notify(store);
       return obj;
     },
 
     async putAll(store, items) {
+      // NOTE: putAll is the BULK path used by cloud pull + seed — it must NOT
+      // stamp updatedAt, or it would clobber the remote record's version and
+      // break last-write-wins. Only single local edits (put/writeTx) bump it.
       const t = _db.transaction(store, 'readwrite');
       const s = t.objectStore(store);
       items.forEach((it) => s.put(it));
@@ -122,6 +137,58 @@
         t.onerror = () => reject(t.error);
       });
       OrbitDB._notify(store);
+    },
+
+    // Atomic multi-store write. `ops` is a list of
+    //   { store, op: 'put' | 'delete', value }
+    // applied inside ONE IndexedDB transaction across all referenced stores —
+    // so either every op commits or none do. Use this whenever a single user
+    // action must touch >1 store (e.g. an expense + its activity entry); a crash
+    // mid-way can no longer leave the stores out of sync.
+    async writeTx(ops) {
+      if (!_db) throw new Error('OrbitDB not initialised. Call OrbitDB.init() first.');
+      if (!ops || !ops.length) return ops;
+      const stores = Array.from(new Set(ops.map((o) => o.store)));
+      const t = _db.transaction(stores, 'readwrite');
+      const done = new Promise((resolve, reject) => {
+        t.oncomplete = () => resolve();
+        t.onerror = () => reject(t.error);
+        t.onabort = () => reject(t.error || new Error('transaction aborted'));
+      });
+      try {
+        ops.forEach((o) => {
+          const s = t.objectStore(o.store);
+          if (o.op === 'delete') s.delete(o.value);
+          else s.put(stamp(o.store, o.value));
+        });
+      } catch (err) {
+        // A synchronous put/delete failure (e.g. missing keyPath, unclonable
+        // value) does NOT abort the transaction on its own — already-queued ops
+        // would still commit. Abort explicitly so the write is truly all-or-nothing.
+        try { t.abort(); } catch (_) {}
+        await done.catch(() => {});   // let the abort settle (rolls everything back)
+        throw err;
+      }
+      await done;
+      stores.forEach((s) => OrbitDB._notify(s));
+      return ops;
+    },
+
+    // Pure last-write-wins merge of two record sets by `updatedAt`. Returns the
+    // union keyed by `keyField`, keeping the higher-versioned copy of each
+    // record (remote wins ties so a freshly-pulled doc takes effect). This is
+    // the building block for a non-destructive cloud pull — see README
+    // "Cloud sync & conflict strategy".
+    mergeByUpdatedAt(localArr, remoteArr, keyField) {
+      const key = keyField || 'id';
+      const map = new Map();
+      (localArr || []).forEach((x) => { if (x && x[key] != null) map.set(x[key], x); });
+      (remoteArr || []).forEach((r) => {
+        if (!r || r[key] == null) return;
+        const cur = map.get(r[key]);
+        if (!cur || (r.updatedAt || 0) >= (cur.updatedAt || 0)) map.set(r[key], r);
+      });
+      return Array.from(map.values());
     },
 
     async clear(store) {

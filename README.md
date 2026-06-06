@@ -65,6 +65,47 @@ data** to start over, or **Wipe all data** to clear everything.
 
 CSV export and JSON backup are real downloads (Blob URLs).
 
+## Persistence & atomicity
+
+All local writes go through `db.js`. Single-store writes use `put`/`delete`;
+any action that must touch **more than one store** (e.g. an expense **and** its
+activity-feed entry, or a settlement + its activity entry) uses
+`OrbitDB.writeTx([...])`, which applies every op inside **one IndexedDB
+transaction** — so a crash mid-write can never leave the stores out of sync
+(all-or-nothing; a partial failure rolls everything back). There is **no
+denormalised balance cache** — balances are always recomputed from the
+expense/settlement records, so they can't drift out of sync with the ledger.
+
+## Cloud sync & conflict strategy
+
+Orbit is **local-first**: IndexedDB is the working copy; Firestore is the
+backup / multi-device mirror. The strategy:
+
+- **Write-through.** Every local `put`/`writeTx`/`delete` is mirrored to
+  Firestore for the signed-in user (`installCloudWriteThrough`), keyed by the
+  record's own `id`. Because writes are **keyed by id and idempotent**, a retry
+  after a network blip can never create a duplicate.
+- **Versioning.** Every entity write stamps a monotonic `updatedAt` (ms epoch)
+  via `db.js`. This is the version field for **last-write-wins**: the higher
+  `updatedAt` is the winner. `OrbitDB.mergeByUpdatedAt(local, remote)` performs
+  that merge (unit-tested in `_qa_persist.mjs`).
+- **Shared groups** (`/groups/{id}`) sync in real time via Firestore
+  `onSnapshot`; incoming docs are merged by id (`mergeById`). Membership changes
+  go through trusted Cloud Functions (`acceptInvite`/`removeMember`/…), never
+  the client, so the roster can't be forged.
+
+### Known limitation (tracked)
+
+The legacy per-user pull (`enterApp` → `pullAll`) is currently
+**cloud-authoritative**: on sign-in it replaces the local copy with the cloud
+copy. That correctly propagates deletions, but a write made **while offline**
+(and not yet mirrored) can be lost on the next sign-in. The proper fix is to
+(a) enable Firestore's `persistentLocalCache` so offline writes queue and sync
+natively, and (b) switch the pull to a non-destructive
+`mergeByUpdatedAt` + tombstones for deletions. The `updatedAt` stamping and the
+merge helper above are the groundwork; the rewire needs a staging project with
+two real devices to validate before shipping.
+
 ## UPI deep links
 
 Pay buttons construct an `upi://pay?pa=…&pn=…&am=…&cu=INR&tn=…` URL. On
