@@ -225,6 +225,38 @@
       return out;
     },
 
+    // Restore a JSON backup produced by exportAll(). Validates structure and
+    // rejects a malformed/corrupt file rather than writing garbage. The `meta`
+    // store is intentionally NOT restored (it holds the device's API keys /
+    // flags). With opts.merge=false (default) each restored store is replaced;
+    // with merge=true records are upserted on top of the current data.
+    async importAll(data, opts = {}) {
+      if (!data || typeof data !== 'object') throw new Error('Not a valid Orbit backup (expected an object).');
+      const restorable = ['users', 'groups', 'expenses', 'settlements', 'activity'];
+      const present = restorable.filter((s) => Array.isArray(data[s]));
+      if (!present.length) throw new Error('Backup has no recognizable data (no users/groups/expenses).');
+
+      const valid = (store, r) => {
+        if (!r || typeof r !== 'object' || r.id == null) return false;
+        if (store === 'expenses') return typeof r.amount === 'number' && isFinite(r.amount) && Array.isArray(r.splits);
+        if (store === 'settlements') return typeof r.amount === 'number' && isFinite(r.amount);
+        return true;
+      };
+      // Validate everything FIRST so a bad record aborts before any write.
+      for (const s of present) {
+        for (const r of data[s]) {
+          if (!valid(s, r)) throw new Error('Backup is corrupt: an invalid ' + s.replace(/s$/, '') + ' record was found.');
+        }
+      }
+      const counts = {};
+      for (const s of present) {
+        if (!opts.merge) await OrbitDB.clear(s);
+        if (data[s].length) await OrbitDB.putAll(s, data[s]);
+        counts[s] = data[s].length;
+      }
+      return { stores: present, counts };
+    },
+
     // Tiny pub/sub for store changes
     _listeners: {},
     on(store, fn) {
