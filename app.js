@@ -1783,9 +1783,20 @@
   function removeMemberFromGroup(g, mid) {
     const u = State.users.find((x) => x.id === mid);
     const name = u ? u.name : 'this member';
+    // Surface an unsettled balance so the owner doesn't silently orphan a debt:
+    // removing a member keeps their expenses, so a non-zero balance would linger
+    // attributed to someone no longer in the roster.
+    const mat = computeGroupMatrix(g.id);
+    const bal = mat ? Math.round((mat.net[mid] || 0) * 100) / 100 : 0;
+    let warn = '';
+    if (Math.abs(bal) > 0.01) {
+      const amt = fmtMoney(Math.abs(bal), g.currency);
+      const dir = bal < 0 ? 'owes the group' : 'is owed by the group';
+      warn = `<div style="background:rgba(229,72,77,0.08);border:1px solid rgba(229,72,77,0.32);color:#C0383C;padding:9px 11px;border-radius:9px;margin-bottom:12px;font-size:13px;line-height:1.4"><strong>Heads up:</strong> ${escapeHtml(name)} still ${dir} <strong>${escapeHtml(amt)}</strong>. Removing them leaves that balance unsettled — settle up first if you can.</div>`;
+    }
     openConfirmModal({
       title: 'Remove ' + name + '?',
-      bodyHtml: `<strong>${escapeHtml(name)}</strong> will be removed from <strong>${escapeHtml(g.name)}</strong>. Their past expenses stay, but they lose access to the group. You can add them back later.`,
+      bodyHtml: warn + `<strong>${escapeHtml(name)}</strong> will be removed from <strong>${escapeHtml(g.name)}</strong>. Their past expenses stay, but they lose access to the group. You can add them back later.`,
       confirmText: 'Remove',
       danger: true,
       onConfirm: () => doRemoveMember(g, mid, name)
