@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#F6F2E8" />
+  <title>Privacy Policy — Orbit</title>
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=7" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg:#F6F2E8; --surface:#fff; --border:#E5DECC;
+      --ink:#1A1814; --ink-2:#3D372C; --ink-3:#6B6353; --accent:#2A2356;
+      --serif:"Fraunces","Iowan Old Style",Georgia,serif;
+      --ui:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink-2);font-family:var(--ui);font-size:15px;line-height:1.6;
+      -webkit-font-smoothing:antialiased;
+      background-image:radial-gradient(900px 600px at 12% -8%,rgba(42,35,86,.05),transparent 50%),radial-gradient(820px 560px at 100% 102%,rgba(166,106,20,.045),transparent 55%);}
+    .wrap{max-width:720px;margin:0 auto;padding:56px 24px 96px}
+    .brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);margin-bottom:40px}
+    .brand-mark{width:28px;height:28px}
+    .brand-name{font-family:"Fredoka","Inter",sans-serif;font-weight:600;font-size:24px;letter-spacing:-.02em;color:#34B87A}
+    .brand-dot{color:#E07B3C}
+    h1{font-family:var(--serif);font-weight:400;font-size:40px;letter-spacing:-.025em;line-height:1.05;color:var(--ink);margin:0 0 6px}
+    .updated{color:var(--ink-3);font-size:13px;margin:0 0 36px}
+    h2{font-family:var(--serif);font-weight:500;font-size:22px;letter-spacing:-.02em;color:var(--ink);margin:36px 0 10px}
+    p{margin:0 0 14px}
+    ul{margin:0 0 14px;padding-left:20px}
+    li{margin:0 0 7px}
+    a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+    strong{color:var(--ink)}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 28px 8px;box-shadow:0 1px 0 rgba(26,24,20,.04),0 4px 14px -2px rgba(26,24,20,.08)}
+    .foot{margin-top:40px;font-size:13px;color:var(--ink-3)}
+    .foot a{color:var(--ink-3)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="brand" href="/index.html">
+      <span class="brand-name">Orbit<span class="brand-dot">.</span></span>
+    </a>
+
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: 7 June 2026 · Early-access build</p>
+
+    <div class="card">
+      <p>Orbit is an expense-splitting ledger for friends and groups. It is built and operated by an individual maker (“we”, “us”). This policy explains, in plain language, what data Orbit handles and why. Orbit is in <strong>early access</strong> — we’ll update this page as the product matures.</p>
+
+      <h2>Who we are</h2>
+      <p>Orbit is a personal/early-access project. For any privacy question or request, contact <a href="mailto:sushanthvarma@gmail.com">sushanthvarma@gmail.com</a>.</p>
+
+      <h2>What we collect</h2>
+      <ul>
+        <li><strong>Account info</strong> from Google Sign-In: your name, email, and profile photo. We use this to identify you and show co-members who you are.</li>
+        <li><strong>Data you enter</strong>: groups, expenses, amounts, notes, settlements, and an optional UPI ID you add for settling up.</li>
+        <li><strong>Basic technical data</strong> needed to run the app (e.g. your authenticated user ID and timestamps).</li>
+      </ul>
+      <p>Orbit is a <strong>ledger only</strong> — it never holds, moves, or processes your money. Settlements happen outside Orbit (e.g. via your own UPI app); we don’t collect card or bank details.</p>
+
+      <h2>Where it’s stored</h2>
+      <p>Your data is stored using <strong>Google Firebase</strong> (Authentication and Cloud Firestore) on Google Cloud infrastructure. Access is controlled by security rules: your private data is visible only to you, and shared-group data is visible only to members of that group.</p>
+
+      <h2>AI features</h2>
+      <p>If you use AI quick-add, the text you submit is sent to an AI model to turn it into a structured expense. If you supply your own AI provider key, that processing uses your key. We don’t use your expense data to train models.</p>
+
+      <h2>How we use it</h2>
+      <ul>
+        <li>To provide the core service: tracking balances, splitting expenses, and syncing across your devices and group members.</li>
+        <li>To operate, secure, and debug the app.</li>
+      </ul>
+      <p>We do <strong>not</strong> sell your data or use it for advertising.</p>
+
+      <h2>Sharing</h2>
+      <p>Data in a <strong>shared group</strong> is visible to the people you invite to that group. Beyond that, we don’t share your personal data with third parties except the infrastructure providers above (Google Firebase) that are necessary to run Orbit.</p>
+
+      <h2>Your choices</h2>
+      <ul>
+        <li>You can keep groups <strong>local to your device</strong> by leaving “Sync with members” off.</li>
+        <li>You can request deletion of your account and associated data by emailing us.</li>
+      </ul>
+
+      <h2>Children</h2>
+      <p>Orbit isn’t directed at children under 13 (or the minimum age in your region).</p>
+
+      <h2>Changes</h2>
+      <p>We may update this policy as Orbit evolves. Material changes will be reflected by the “last updated” date above.</p>
+
+      <p class="foot">Questions? <a href="mailto:sushanthvarma@gmail.com">sushanthvarma@gmail.com</a> · See also our <a href="/terms.html">Terms of Service</a>.</p>
+    </div>
+  </div>
+</body>
+</html>

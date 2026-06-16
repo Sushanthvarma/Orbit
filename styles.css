@@ -1,63 +1,67 @@
 /* ============================================================
-   ORBIT WEB — Design system (cream-light / glass)
-   Re-skinned per design_handoff_orbit/ — warm cream surfaces,
-   floating glass sidebar, layered pillow shadows, Iris accent.
-   Class names preserved for compatibility with app.js.
+   ORBIT WEB — Editorial Fintech design system
+   Re-skinned June 2026 per /Claude Design UI reference — warm
+   editorial paper, ink-indigo accent, Fraunces serif display.
+   Class names preserved for compatibility with app.js; the legacy
+   glass/iris surfaces are overridden in the EDITORIAL RE-SKIN block
+   at the foot of this file.
    ============================================================ */
 
 /* ---------- Tokens ---------- */
 :root, [data-theme="light"] {
-  /* Surfaces */
-  --bg:               #F6F2EA;          /* warm cream — page background */
-  --bg-2:             #FBF8F1;          /* soft cream — inputs */
-  --bg-sidebar:       rgba(255,255,255,0.55); /* glass */
-  --bg-topbar:        rgba(246,242,234,0.78);
+  /* Surfaces — editorial paper */
+  --bg:               #F6F2E8;          /* warm paper — page background */
+  --bg-2:             #FBF8F1;          /* soft paper — inputs / table heads */
+  --bg-sidebar:       #F6F2E8;          /* attached paper column (no glass) */
+  --bg-topbar:        rgba(246,242,232,0.85);
   --surface-1:        #FFFFFF;           /* card */
   --surface-2:        #FBF8F1;           /* raised input */
-  --surface-3:        #F1ECE0;           /* hover */
-  --surface-hover:    rgba(255,255,255,0.6);
-  --surface-active:   rgba(10,10,15,0.04);
+  --surface-3:        #F1ECDE;           /* hover */
+  --surface-hover:    var(--accent-tint);
+  --surface-active:   var(--accent-tint-strong);
 
-  /* Ink */
-  --text-1:           #0A0A0F;
-  --text-2:           #3A3A45;
-  --text-3:           #6B6F7E;
-  --text-disabled:    #A0A4B0;
+  /* Ink — warm near-black */
+  --text-1:           #1A1814;
+  --text-2:           #3D372C;
+  --text-3:           #6B6353;
+  --text-disabled:    #98917F;
+  --ink-faint:        #BFB8A4;
 
-  /* Lines */
-  --line:             rgba(10,10,15,0.07);
-  --line-strong:      rgba(10,10,15,0.12);
-  --line-soft:        rgba(10,10,15,0.04);
+  /* Lines — warm solid borders */
+  --line:             #E5DECC;
+  --line-strong:      #D2C9AF;
+  --line-soft:        #EFE9DB;
 
-  /* Iris accent (the one hero accent) */
-  --accent:           #6B5BFF;
-  --accent-2:         #8A7CFF;
-  --accent-3:         #B4A8FF;
-  --accent-soft:      #EFEBFF;
-  --accent-tint:      rgba(107,91,255,0.08);
-  --accent-glow:      rgba(107,91,255,0.35);
-  --accent-line:      rgba(107,91,255,0.18);
+  /* Accent — deep ink-indigo (editorial, the one hero accent) */
+  --accent:           #2A2356;
+  --accent-2:         #4A3F8A;
+  --accent-3:         #E8E4F5;
+  --accent-soft:      #E8E4F5;
+  --accent-tint:      rgba(42,35,86,0.06);
+  --accent-tint-strong: rgba(42,35,86,0.12);
+  --accent-glow:      rgba(42,35,86,0.24);
+  --accent-line:      rgba(42,35,86,0.14);
   --accent-on:        #FFFFFF;
 
-  /* Semantic */
-  --pos:              #00A87E;
-  --pos-soft:         rgba(0,168,126,0.10);
-  --neg:              #E5484D;
-  --neg-soft:         rgba(229,72,77,0.10);
-  --warn:             #F5A623;
-  --warn-soft:        rgba(245,166,35,0.10);
-  --info:             #3B82F6;
-  --info-soft:        rgba(59,130,246,0.10);
+  /* Semantic — deep editorial */
+  --pos:              #1F6F4A;
+  --pos-soft:         rgba(31,111,74,0.10);
+  --neg:              #A93020;
+  --neg-soft:         rgba(169,48,32,0.10);
+  --warn:             #A66A14;
+  --warn-soft:        rgba(166,106,20,0.12);
+  --info:             #355E8A;
+  --info-soft:        rgba(53,94,138,0.10);
 
-  /* Category dots */
-  --cat-food:         #F5A623;
-  --cat-travel:       #3B82F6;
-  --cat-bills:        #8A7CFF;
-  --cat-shop:         #E5484D;
-  --cat-fun:          #F5A623;
-  --cat-rent:         #00A87E;
-  --cat-transport:    #6B5BFF;
-  --cat-other:        #A0A4B0;
+  /* Category dots — editorial palette */
+  --cat-food:         #A66A14;
+  --cat-travel:       #1A5564;
+  --cat-bills:        #4A3F8A;
+  --cat-shop:         #A93020;
+  --cat-fun:          #7A4F1A;
+  --cat-rent:         #1F6F4A;
+  --cat-transport:    #2A2356;
+  --cat-other:        #98917F;
 
   /* Radii */
   --r-1:              6px;
@@ -86,33 +90,28 @@
   --topbar-h:         60px;
   --frame-pad:        14px;
 
-  /* Shadow system — LAYERED for real 3D depth */
-  --sh-1:             0 1px 2px rgba(10,10,15,.04), 0 0 0 1px rgba(10,10,15,.04);
-  --sh-2:             0 4px 14px rgba(10,10,15,.05), 0 1px 3px rgba(10,10,15,.04);
-  --sh-3:             0 14px 40px rgba(10,10,15,.07), 0 4px 12px rgba(10,10,15,.04);
-  --sh-4:             0 40px 100px -10px rgba(10,10,15,.18), 0 16px 40px -10px rgba(10,10,15,.08);
-  --sh-iris:          0 24px 60px -15px rgba(107,91,255,.4), 0 10px 30px -5px rgba(10,10,15,.08);
+  /* Shadow system — soft, warm, editorial (rgba 26,24,20) */
+  --sh-1:             0 1px 0 rgba(26,24,20,.04), 0 1px 2px rgba(26,24,20,.05);
+  --sh-2:             0 1px 0 rgba(26,24,20,.04), 0 4px 14px -2px rgba(26,24,20,.09);
+  --sh-3:             0 1px 0 rgba(26,24,20,.04), 0 12px 32px -4px rgba(26,24,20,.14);
+  --sh-4:             0 24px 64px -12px rgba(26,24,20,.24), 0 4px 12px rgba(26,24,20,.08);
+  --sh-iris:          0 14px 36px -10px rgba(42,35,86,.30), 0 4px 12px rgba(26,24,20,.08);
   --sh-pillow:
-                      inset 0 1px 0 rgba(255,255,255,.9),
-                      inset 0 -1px 0 rgba(10,10,15,.04),
-                      0 1px 2px rgba(10,10,15,.04),
-                      0 4px 12px rgba(10,10,15,.05),
-                      0 0 0 1px rgba(10,10,15,.05);
+                      inset 0 1px 0 rgba(255,255,255,.6),
+                      0 1px 2px rgba(26,24,20,.05),
+                      0 4px 12px -2px rgba(26,24,20,.07);
   --sh-glass-float:
-                      inset 0 1px 0 rgba(255,255,255,.7),
-                      inset 0 -1px 0 rgba(10,10,15,.03),
-                      0 1px 2px rgba(10,10,15,.04),
-                      0 14px 36px -8px rgba(10,10,15,.08),
-                      0 40px 80px -20px rgba(10,10,15,.12);
+                      0 1px 0 rgba(26,24,20,.04),
+                      0 4px 14px -2px rgba(26,24,20,.09);
 
   --shadow-1:         var(--sh-1);
   --shadow-2:         var(--sh-2);
   --shadow-modal:     var(--sh-4);
 
-  /* Type */
+  /* Type — Fraunces serif display, Inter UI, JetBrains mono numerals */
   --font-ui:          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-display:     'Sora', 'Inter', -apple-system, sans-serif;
-  --font-serif:       'Instrument Serif', Georgia, serif;
+  --font-display:     'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-serif:       'Fraunces', 'Instrument Serif', Georgia, serif;
   --font-mono:        'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
 
   /* Motion */
@@ -231,7 +230,7 @@ svg { display: block; }
   color: var(--text-2);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 1px 2px rgba(10,10,15,0.03);
 }
-.search:focus-within { background: #fff; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint), inset 0 1px 0 rgba(255,255,255,0.7); }
+.search:focus-within { background: var(--surface-1); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint), inset 0 1px 0 rgba(255,255,255,0.7); }
 .search input { flex: 1; font-size: 13px; color: var(--text-1); font-weight: 500; }
 .search input::placeholder { color: var(--text-disabled); font-weight: 400; }
 .search kbd {
@@ -377,7 +376,7 @@ svg { display: block; }
 .btn {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 9px 16px;
-  background: #fff; color: var(--text-1);
+  background: var(--surface-1); color: var(--text-1);
   border: 1px solid var(--line);
   border-radius: var(--r-3);
   font-size: 13.5px; font-weight: 600;
@@ -453,7 +452,7 @@ svg { display: block; }
 
 /* ---------- Cards ---------- */
 .card {
-  background: #fff;
+  background: var(--surface-1);
   border: 1px solid var(--line);
   border-radius: var(--r-4);
   box-shadow: var(--sh-1);
@@ -481,7 +480,7 @@ svg { display: block; }
 /* KPI / stat tile */
 .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-4); margin-bottom: var(--s-6); }
 .kpi {
-  background: #fff;
+  background: var(--surface-1);
   border: 1px solid var(--line);
   border-radius: var(--r-5);
   padding: 22px 24px;
@@ -625,7 +624,7 @@ svg { display: block; }
 .toolbar {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2);
   padding: var(--s-3) var(--s-5);
-  background: #fff; border: 1px solid var(--line);
+  background: var(--surface-1); border: 1px solid var(--line);
   border-radius: var(--r-3); margin-bottom: var(--s-4);
   box-shadow: var(--sh-1);
 }
@@ -642,14 +641,14 @@ svg { display: block; }
 }
 .seg button:hover { color: var(--text-1); }
 .seg button.active {
-  background: #fff; color: var(--text-1);
+  background: var(--surface-1); color: var(--text-1);
   box-shadow: var(--sh-1); font-weight: 600;
 }
 
 /* ---------- Group cards ---------- */
 .group-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .group-card {
-  background: #fff; border: 1px solid var(--line);
+  background: var(--surface-1); border: 1px solid var(--line);
   border-radius: var(--r-4); padding: 18px;
   box-shadow: var(--sh-1);
   transition: all var(--dur-fast) var(--ease);
@@ -750,7 +749,7 @@ svg.chart .bar.on { fill: url(#bar-grad); }
 }
 .input::placeholder, .textarea::placeholder { color: var(--text-disabled); font-weight: 400; }
 .input:focus, .select:focus, .textarea:focus {
-  background: #fff; border-color: var(--accent);
+  background: var(--surface-1); border-color: var(--accent);
   box-shadow: 0 0 0 4px var(--accent-tint);
 }
 .textarea { min-height: 64px; resize: vertical; line-height: 1.5; }
@@ -771,11 +770,11 @@ svg.chart .bar.on { fill: url(#bar-grad); }
   border-radius: var(--r-3);
   transition: all var(--dur-micro) var(--ease);
 }
-.member-row.checked { background: #fff; border-color: var(--accent-line); }
+.member-row.checked { background: var(--surface-1); border-color: var(--accent-line); }
 .member-row .cb {
   width: 22px; height: 22px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: #fff; border: 1.5px solid var(--line-strong);
+  background: var(--surface-1); border: 1.5px solid var(--line-strong);
   border-radius: 6px; cursor: pointer;
   font-size: 12px; color: var(--text-1); font-weight: 700;
 }
@@ -793,7 +792,7 @@ svg.chart .bar.on { fill: url(#bar-grad); }
 }
 @keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 .modal {
-  background: #fff;
+  background: var(--surface-1);
   border-radius: var(--r-6);
   box-shadow: var(--sh-4);
   width: 500px; max-width: 95vw; max-height: 92vh;
@@ -872,7 +871,7 @@ svg.chart .bar.on { fill: url(#bar-grad); }
    expected behavior: the hidden attribute wins. */
 .login-gate[hidden] { display: none !important; }
 .login-card {
-  background: #fff;
+  background: var(--surface-1);
   border: 1px solid var(--line);
   border-radius: var(--r-6);
   padding: 36px 32px 32px;
@@ -891,7 +890,7 @@ svg.chart .bar.on { fill: url(#bar-grad); }
 .login-google {
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
   width: 100%; padding: 13px 18px;
-  background: #fff; color: var(--text-1);
+  background: var(--surface-1); color: var(--text-1);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   font-size: 14px; font-weight: 600;
@@ -914,7 +913,7 @@ svg.chart .bar.on { fill: url(#bar-grad); }
   display: grid; grid-template-columns: auto 1fr auto;
   gap: var(--s-4); align-items: center;
 }
-.identity-photo { width: 48px; height: 48px; border-radius: 999px; box-shadow: 0 0 0 2px #fff, 0 4px 12px rgba(10,10,15,0.10); }
+.identity-photo { width: 48px; height: 48px; border-radius: 999px; object-fit: cover; object-position: center 30%; box-shadow: 0 0 0 2px #fff, 0 4px 12px rgba(10,10,15,0.10); }
 .identity-name { font-size: 16px; font-weight: 600; color: var(--text-1); }
 .identity-email { font-size: 13px; color: var(--text-3); margin-top: 2px; }
 .identity-uid { font-family: var(--font-mono); font-size: 11px; color: var(--text-disabled); margin-top: 4px; }
@@ -922,7 +921,7 @@ svg.chart .bar.on { fill: url(#bar-grad); }
 /* ---------- Toast ---------- */
 .toast-root { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
 .toast {
-  background: #fff; color: var(--text-1);
+  background: var(--surface-1); color: var(--text-1);
   border: 1px solid var(--line);
   box-shadow: var(--sh-3);
   border-radius: var(--r-3);
@@ -957,7 +956,7 @@ svg.chart .bar.on { fill: url(#bar-grad); }
 .orbit-switch .orbit-switch-knob {
   position: absolute; top: 3px; left: 3px;
   width: 20px; height: 20px; border-radius: var(--r-pill);
-  background: #fff; box-shadow: var(--sh-1);
+  background: var(--surface-1); box-shadow: var(--sh-1);
   transition: transform var(--dur-micro) var(--ease);
 }
 .orbit-switch.on { background: var(--accent); }
@@ -991,7 +990,7 @@ svg.chart .bar.on { fill: url(#bar-grad); }
 .more-icon {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; border-radius: 8px;
-  background: #fff; border: 1px solid var(--line);
+  background: var(--surface-1); border: 1px solid var(--line);
   font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--text-2);
 }
 .more-item.active .more-icon { border-color: var(--accent); color: var(--accent); }
@@ -1004,6 +1003,10 @@ svg.chart .bar.on { fill: url(#bar-grad); }
   color: var(--text-3); text-decoration: none;
   font-size: 10.5px; font-weight: 600; letter-spacing: -0.01em;
   -webkit-tap-highlight-color: transparent;
+  /* #tabMore is a <button> — reset the UA button face (was a white box,
+     glaring in dark mode) so it matches the <a> tab items. */
+  -webkit-appearance: none; appearance: none;
+  background: none; border: 0; font-family: inherit; cursor: pointer;
 }
 .tab-item svg { width: 22px; height: 22px; }
 .tab-item.active { color: var(--accent); }
@@ -1129,20 +1132,20 @@ th.sorted .sort-arrow { color: var(--accent); }
   transition: all var(--dur-micro) var(--ease);
 }
 .filter-input::placeholder { color: var(--text-disabled); font-weight: 400; }
-.filter-input:focus { background: #fff; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint); }
+.filter-input:focus { background: var(--surface-1); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint); }
 .inline-edit {
   font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: -0.03em;
   color: var(--text-1); background: transparent; border: 1px solid transparent;
   border-radius: var(--r-2); padding: 2px 6px; margin-left: -6px; width: 100%; max-width: 460px;
 }
 .inline-edit:hover { background: var(--bg-2); }
-.inline-edit:focus { background: #fff; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint); }
+.inline-edit:focus { background: var(--surface-1); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint); }
 
 /* ---- Member chips ---- */
 .member-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--s-5); }
 .member-chip {
   display: inline-flex; align-items: center; gap: 7px;
-  background: #fff; border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--r-pill);
   padding: 5px 12px 5px 7px; font-size: 12.5px; font-weight: 600; color: var(--text-2);
   box-shadow: var(--sh-1); cursor: pointer; transition: all var(--dur-micro) var(--ease);
 }
@@ -1152,7 +1155,7 @@ th.sorted .sort-arrow { color: var(--accent); }
 .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-4); margin-bottom: var(--s-5); }
 .trip-summary { display: flex; gap: var(--s-5); }
 .stat, .stat-strip > div {
-  background: #fff; border: 1px solid var(--line); border-radius: var(--r-4);
+  background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--r-4);
   padding: 16px 18px; box-shadow: var(--sh-1); flex: 1;
 }
 .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-disabled); margin-bottom: 8px; }
@@ -1189,7 +1192,7 @@ th.sorted .sort-arrow { color: var(--accent); }
 .lg-amt { font-family: var(--font-display); font-weight: 600; font-variant-numeric: tabular-nums; margin-left: auto; color: var(--text-1); }
 
 /* ---- Trips ---- */
-.trip-card { background: #fff; border: 1px solid var(--line); border-radius: var(--r-5); box-shadow: var(--sh-1); overflow: hidden; margin-bottom: var(--s-5); transition: all var(--dur-fast) var(--ease); }
+.trip-card { background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--r-5); box-shadow: var(--sh-1); overflow: hidden; margin-bottom: var(--s-5); transition: all var(--dur-fast) var(--ease); }
 .trip-card:hover { box-shadow: var(--sh-2); }
 .trip-hero { position: relative; padding: 24px 26px; color: #fff; overflow: hidden; }
 .trip-hero::after { content:''; position:absolute; inset:0; background: linear-gradient(135deg, rgba(10,10,15,.18), rgba(10,10,15,.42)); pointer-events:none; }
@@ -1202,12 +1205,12 @@ th.sorted .sort-arrow { color: var(--accent); }
 .trip-meta { font-size: 12.5px; }
 .trip-meta-dot { width: 3px; height: 3px; border-radius: 999px; background: currentColor; opacity: .6; }
 .trip-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--line); }
-.trip-kpi { background: #fff; padding: 16px 18px; }
+.trip-kpi { background: var(--surface-1); padding: 16px 18px; }
 .trip-kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-disabled); margin-bottom: 6px; }
 .trip-kpi-value { font-family: var(--font-display); font-size: 18px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--text-1); }
 .trip-kpi-value.pos { color: var(--pos); } .trip-kpi-value.neg { color: var(--neg); }
 .trip-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border-top: 1px solid var(--line); }
-.trip-panel { background: #fff; padding: 20px; }
+.trip-panel { background: var(--surface-1); padding: 20px; }
 .trip-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-family: var(--font-display); font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
 .trip-cat-body { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); }
 .trip-foot { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--line); background: var(--bg-2); }
@@ -1230,7 +1233,7 @@ th.sorted .sort-arrow { color: var(--accent); }
   display: inline-flex; align-items: center; justify-content: center;
   width: 32px; height: 32px; flex-shrink: 0;
   border-radius: var(--r-2); border: 1px solid var(--line);
-  background: #fff; color: #25D366; cursor: pointer;
+  background: var(--surface-1); color: #25D366; cursor: pointer;
   box-shadow: var(--sh-1); transition: all var(--dur-micro) var(--ease);
 }
 .btn-wa:hover { background: #25D366; color: #fff; border-color: transparent; transform: translateY(-1px); box-shadow: var(--sh-2); }
@@ -1301,3 +1304,1552 @@ textarea:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   EDITORIAL RE-SKIN (June 2026)
+   Overrides the legacy glass/iris surfaces so every view adopts the
+   paper + ink-indigo + Fraunces system from /Claude Design UI.
+   Source-ordered last so it wins over the rules above.
+   ============================================================ */
+
+/* ---- Display type: Fraunces, editorial light weights + optical sizing ---- */
+.brand-name, .page-header h1, .section-title, .card-header h3, .modal-head h2,
+.modal-head .close, .kpi-value, .kpi-label, .stat-value, .gc-bal, .gc-name,
+.gc-foot .tabular, .login-card h1, .empty-title, .trip-name, .trip-kpi-value,
+.owes-row .amt, .feed-row .amt, .matrix td:not(:first-child), .col-amt,
+.inline-edit, .hbar-val, .lg-amt, .paid-amt, .stat-label, .trip-kpi-label {
+  font-optical-sizing: auto;
+}
+.page-header h1, .kpi-value, .stat-value, .gc-bal, .login-card h1,
+.modal-head h2, .inline-edit {
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+.card-header h3, .section-title, .gc-name, .trip-name, .empty-title {
+  font-weight: 600;
+}
+.brand-name { font-weight: 500; letter-spacing: -0.02em; font-size: 19px; }
+.page-header h1 { font-size: 40px; line-height: 1.05; }
+.page-header .em, .login-card h1 .em { font-style: italic; font-weight: 400; color: var(--accent); }
+
+/* ---- Background: editorial "ink + ochre" wash, no iris mesh ----
+   Larger, a touch more present than before so the cream reads as LIT paper
+   rather than flat fill — still well under the "gratuitous gradient" line.
+   A very slow ambient drift gives it quiet life. */
+.bg-mesh {
+  background:
+    radial-gradient(1100px 780px at 4% -10%, rgba(42,35,86,0.22), transparent 58%),
+    radial-gradient(1040px 720px at 106% 0%, rgba(166,106,20,0.16), transparent 60%),
+    radial-gradient(1300px 880px at 50% 122%, rgba(42,35,86,0.15), transparent 62%);
+  animation: meshDrift 34s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes meshDrift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(-1.6%, 1.2%, 0) scale(1.07); }
+}
+/* Faint concentric "orbit" rings, top-right — a quiet nod to the brand mark
+   and the net-position card's orbit graphic. Thin ink rings, masked so they
+   dissolve toward the centre. */
+.bg-mesh::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-radial-gradient(circle at 92% 6%,
+    transparent 0 64px, rgba(42,35,86,0.045) 64px 65px);
+  -webkit-mask-image: radial-gradient(1200px 900px at 92% 6%, #000 0%, transparent 72%);
+  mask-image: radial-gradient(1200px 900px at 92% 6%, #000 0%, transparent 72%);
+}
+.bg-grid {
+  background-image: radial-gradient(rgba(26,24,20,0.055) 1px, transparent 1px);
+  background-size: 30px 30px;
+  opacity: 0.9;
+}
+/* Paper grain — fine fractal-noise tooth, the signature of the editorial
+   surface. Multiply speckles the cream so it feels like stock, not screen.
+   Static, GPU-cheap, pointer-events none. */
+.bg-grain {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  opacity: 0.7;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.085'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bg-mesh { animation: none; }
+}
+
+/* ---- Shell: sidebar becomes an attached editorial paper column ---- */
+.app-shell { grid-template-columns: var(--sidebar-w) 1fr; }
+.sidebar {
+  grid-column: 1; grid-row: 2;
+  margin: 0; width: auto; border-radius: 0;
+  background: var(--bg);
+  border: none; border-right: 1px solid var(--line);
+  box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  overflow-y: auto;
+}
+.sidebar::before { display: none; }
+.main { grid-column: 2; grid-row: 2; }
+
+/* topbar sits flush above; align its left padding to the brand */
+.topbar { padding: 0 var(--s-7) 0 var(--s-5); }
+
+/* ---- Nav: editorial active = white surface + hairline + accent rail ---- */
+.nav-item { gap: 11px; border: 1px solid transparent; }
+.nav-item:hover { background: var(--accent-tint); color: var(--text-1); }
+.nav-item.active {
+  background: var(--surface-1);
+  color: var(--text-1); font-weight: 600;
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-1);
+}
+.nav-item.active::before {
+  content: ''; position: absolute; left: -1px; top: 8px; bottom: 8px;
+  width: 2px; background: var(--accent); border-radius: 1px;
+}
+/* feather glyphs, no chip box */
+.nav-icon {
+  width: 18px; height: 18px;
+  background: none; border-radius: 0; opacity: 1;
+  color: var(--text-3); font-size: 0;
+}
+.nav-icon svg { width: 17px; height: 17px; }
+.nav-item:hover .nav-icon, .nav-item.active .nav-icon { color: var(--accent); }
+.nav-label { color: var(--text-disabled); letter-spacing: 0.12em; }
+.mini-btn:hover { background: var(--accent-tint); color: var(--accent); }
+
+/* brand mark + wordmark */
+.brand:hover { background: var(--accent-tint); }
+
+/* ---- me-card: bordered paper card (no glass pillow) ---- */
+.me-card {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-1);
+}
+.me-card:hover { box-shadow: var(--sh-2); }
+
+/* ---- Search / cmdbar in topbar ---- */
+.search {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  box-shadow: none;
+}
+.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+
+/* ---- Buttons: primary = ink, accent flows from token ---- */
+.btn { box-shadow: var(--sh-1); border-radius: var(--r-2); }
+.btn:hover { box-shadow: var(--sh-2); }
+.btn.btn-primary { background: var(--text-1); border-color: var(--text-1); }
+.btn.btn-primary:hover { background: #2E2A22; box-shadow: var(--sh-2); }
+.btn-pay:hover { background: var(--accent); }
+.tab-add {
+  background: var(--accent);
+  box-shadow: 0 6px 16px -4px var(--accent-glow);
+}
+
+/* ---- Avatars: flat editorial colour discs (no iris glow) ---- */
+.avatar {
+  background: var(--accent);
+  box-shadow: 0 0 0 1.5px var(--surface-1);
+}
+.avatar-sm { box-shadow: 0 0 0 1.5px var(--surface-1); }
+.avatar[data-color="1"] { background: #2A2356; box-shadow: 0 0 0 1.5px var(--surface-1); } /* self ink */
+.avatar[data-color="2"] { background: #A66A14; box-shadow: 0 0 0 1.5px var(--surface-1); } /* ochre */
+.avatar[data-color="3"] { background: #1F6F4A; box-shadow: 0 0 0 1.5px var(--surface-1); } /* green */
+.avatar[data-color="4"] { background: #A93020; box-shadow: 0 0 0 1.5px var(--surface-1); } /* brick */
+.avatar[data-color="5"] { background: #1A5564; box-shadow: 0 0 0 1.5px var(--surface-1); } /* teal */
+.avatar[data-color="6"] { background: #4A3F8A; box-shadow: 0 0 0 1.5px var(--surface-1); } /* indigo */
+.avatar[data-color="7"] { background: #7A4F1A; box-shadow: 0 0 0 1.5px var(--surface-1); } /* brown */
+.avatar[data-color="8"] { background: #355E8A; box-shadow: 0 0 0 1.5px var(--surface-1); } /* slate-blue */
+.avatar-stack .avatar { box-shadow: 0 0 0 2px var(--surface-1); margin-left: -8px; }
+.identity-photo { box-shadow: 0 0 0 2px var(--surface-1), var(--sh-1); }
+
+/* ---- KPI strip: 1.6 / 1 / 1 / 1, hero is the indigo net-position card ---- */
+.kpi-grid.bal-row { grid-template-columns: 1.6fr 1fr 1fr 1fr; }
+.kpi { border-radius: var(--r-5); box-shadow: var(--sh-1); }
+.kpi-label { font-family: var(--font-ui); font-weight: 600; letter-spacing: 0.12em; color: var(--text-disabled); }
+.kpi-value { letter-spacing: -0.03em; }
+
+.kpi.kpi-hero {
+  background:
+    radial-gradient(circle at 85% 28%, rgba(74,63,138,0.34), transparent 55%),
+    linear-gradient(135deg, #1A1638 0%, #2A2356 55%, #1A1638 100%);
+  color: #F5EFE0; border-color: transparent;
+  box-shadow: var(--sh-3);
+}
+.kpi.kpi-hero::after { display: none; }
+.kpi.kpi-hero .kpi-label { color: rgba(245,239,224,0.62); }
+.kpi.kpi-hero .kpi-value {
+  background: none;
+  -webkit-text-fill-color: #F5EFE0; color: #F5EFE0;
+}
+.kpi.kpi-hero .kpi-delta { color: rgba(245,239,224,0.74); }
+/* "Net positive" status pill on the hero */
+.kpi-tag {
+  font-size: 11px; padding: 2px 9px; border-radius: var(--r-pill);
+  background: rgba(245,239,224,0.14); color: rgba(245,239,224,0.9);
+  font-weight: 500; white-space: nowrap;
+}
+.kpi-head { display: flex; align-items: center; justify-content: space-between; }
+
+/* KPI sparkline foot (reference cards: sub on the left, trend graph on the right) */
+.kpi { display: flex; flex-direction: column; min-height: 150px; }
+.kpi-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-3); margin-top: auto; padding-top: 10px;
+}
+.kpi-foot-sub { font-size: 12px; color: var(--text-3); white-space: nowrap; }
+.kpi-spark { width: 96px; height: 34px; flex-shrink: 0; }
+.kpi-spark svg { width: 100%; height: 100%; display: block; }
+
+/* ---- Cards / tables: warm hairlines, paper table heads ---- */
+.card { border-radius: var(--r-5); }
+.tbl th { background: var(--surface-2); color: var(--text-disabled); }
+.tbl tr:hover td { background: var(--surface-2); }
+
+/* ---- Chips / segmented / tabs ---- */
+.chip { background: var(--surface-2); border: 1px solid var(--line); color: var(--text-2); }
+.chip.chip-accent { color: var(--accent); background: var(--accent-tint); border-color: transparent; }
+.seg { background: var(--surface-2); border: 1px solid var(--line); }
+.seg button.active { background: var(--surface-1); }
+.tab.active { border-bottom-color: var(--accent); }
+
+/* ---- Inputs ---- */
+.input:focus, .select:focus, .textarea:focus,
+.filter-input:focus, .inline-edit:focus {
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+
+/* ---- Settle now panel: faint green wash like the reference ---- */
+.right-col .card:first-child {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(31,111,74,0.07), transparent 60%),
+    var(--surface-1);
+}
+
+/* ---- Charts: ink-indigo, no leftover iris ---- */
+svg.chart .bar { fill: rgba(42,35,86,0.16); }
+svg.chart .area-line { stroke: var(--accent); }
+.hbar-fill, .paid-meter-paid, .group-card .gc-fill { background: var(--accent); }
+.paid-meter-share { background: var(--accent-2); }
+
+/* ---- Login gate: editorial radials + indigo CTA glow ---- */
+.login-gate {
+  background-image:
+    radial-gradient(900px 600px at 12% 12%, rgba(42,35,86,0.10), transparent 55%),
+    radial-gradient(820px 560px at 88% 100%, rgba(166,106,20,0.08), transparent 55%);
+}
+.login-google { box-shadow: var(--sh-iris); }
+
+/* ---- Orbit hero ornament cream tint when inside the dark hero ---- */
+.kpi.kpi-hero .kpi-orbit { opacity: 0.9; }
+
+/* ============================================================
+   EDITORIAL MOBILE (auto-detected at ≤920px) — floating pill
+   tab bar + raised accent FAB, per the Orbit Mobile reference.
+   ============================================================ */
+@media (max-width: 920px) {
+  /* Re-assert the single-column mobile shell — the desktop
+     `.app-shell { grid-template-columns: var(--sidebar-w) 1fr }` override
+     above is non-media and would otherwise reserve a 248px column for the
+     hidden sidebar, squeezing main into a sliver. */
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .main { grid-column: 1; grid-row: 2; }
+  /* Sidebar is hidden on mobile, so surface the brand in the topbar */
+  .topbar-brand { display: inline-flex; }
+  /* Stack the 4-up KPI strip (editorial non-media override would keep it 4-col) */
+  .kpi-grid.bal-row { grid-template-columns: 1fr; }
+  .grid-2, .grid-2.content-grid { grid-template-columns: 1fr; }
+
+  .tabbar {
+    left: 14px; right: 14px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    height: 58px;
+    background: var(--surface-1);
+    border: 1px solid var(--line);
+    border-top: 1px solid var(--line);
+    border-radius: 26px;
+    box-shadow: var(--sh-3);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    padding-bottom: 0;
+    overflow: visible;
+  }
+  .tab-item { font-size: 10px; letter-spacing: 0.04em; }
+  .tab-item.active { color: var(--accent); }
+  .tab-add {
+    width: 52px; height: 52px; margin-top: 0;
+    background: var(--accent);
+    box-shadow: 0 8px 18px -4px var(--accent-glow), 0 2px 4px rgba(0,0,0,0.1);
+    transform: translateY(-16px);
+  }
+  .tab-add:active { transform: translateY(-16px) scale(0.94); }
+  .main { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+  /* Bigger serif headers + comfy spacing on phones */
+  .page-header h1 { font-size: 30px; }
+  .group-grid { grid-template-columns: 1fr; }
+  .detail-top .actions .btn { flex: 0 0 auto; }
+}
+@media (max-width: 560px) {
+  .group-hero { height: 156px; }
+}
+
+/* ============================================================
+   COVER-ART GROUP CARDS + GROUP-DETAIL HERO (reference match)
+   ============================================================ */
+.group-grid { grid-template-columns: repeat(3, 1fr); gap: var(--s-4); }
+@media (max-width: 1180px) { .group-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.group-card.cover-card {
+  padding: 0; display: flex; flex-direction: column;
+  border-radius: var(--r-5); overflow: hidden;
+}
+.group-cover {
+  aspect-ratio: 16 / 9; position: relative; overflow: hidden;
+}
+.group-cover svg { width: 100%; height: 100%; display: block; }
+.gc-cover-tag {
+  position: absolute; top: 10px; left: 10px;
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: var(--r-pill);
+  background: rgba(246,242,232,0.9);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--text-2); max-width: calc(100% - 20px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.group-body { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
+.cover-card .group-name {
+  font-family: var(--font-display); font-size: 20px; font-weight: 400;
+  letter-spacing: -0.02em; line-height: 1.1; margin: 0; color: var(--text-1);
+}
+.cover-card .gc-desc { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.cover-card .gc-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+.cover-card .gc-bal-block { text-align: right; }
+.cover-card .gc-bal {
+  font-family: var(--font-display); font-size: 18px; font-weight: 400;
+  letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums;
+}
+.cover-card .gc-bal.pos { color: var(--pos); }
+.cover-card .gc-bal.neg { color: var(--neg); }
+.cover-card .gc-bal.zero { color: var(--text-disabled); }
+.cover-card .gc-foot-row { padding-top: var(--s-2); border-top: 1px solid var(--line-soft); }
+
+/* Group-detail stat cards: Members(avatars)/Total spent/Your share/Your position(+Add) */
+.stat-strip > .stat { display: flex; flex-direction: column; }
+.stat-members-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.stat-members-row .stat-value { line-height: 1; }
+
+/* ============================================================
+   "Orbit." wordmark logo — green text + orange dot (rounded Fredoka)
+   ============================================================ */
+.brand-wm {
+  font-family: 'Fredoka', var(--font-ui), sans-serif !important;
+  font-weight: 600; letter-spacing: -0.02em;
+  color: #34B87A; line-height: 1;
+  text-decoration: none !important;
+}
+.brand-wm .brand-dot { color: #E07B3C; }
+/* No link underline on the logo, ever */
+.sidebar-brand, .topbar-brand, .sidebar-brand *, .topbar-brand * { text-decoration: none !important; }
+/* Logo lockup: green-O icon + larger wordmark */
+.sidebar-brand { gap: 10px; padding: 18px 14px 12px; }
+.sidebar-brand .brand-wm { font-size: 27px; }
+.sidebar-brand .sidebar-brand-mark { display: inline-flex; width: 34px; height: 34px; }
+.sidebar-brand .sidebar-brand-mark svg { width: 100%; height: 100%; }
+.topbar-brand { gap: 9px; }
+.topbar-brand .brand-wm { font-size: 22px; }
+.topbar-brand .brand-mark { display: inline-flex; width: 28px; height: 28px; }
+.topbar-brand .brand-mark svg { width: 100%; height: 100%; }
+
+/* Settlement aging — stale-debt nudge */
+.stale-chip { margin-left: 8px; font-size: 10.5px; padding: 1px 7px 1px 5px; gap: 3px; vertical-align: middle; }
+.stale-chip svg { width: 11px; height: 11px; }
+.owes-row-stale { background: rgba(166,106,20,0.045); }
+.owes-row-stale:hover { background: rgba(166,106,20,0.07); }
+
+/* Auto-Insights strip */
+.insight-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-4); margin-bottom: var(--s-5); }
+@media (max-width: 1100px) { .insight-strip { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .insight-strip { grid-template-columns: 1fr; } }
+.insight-card {
+  background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--r-4);
+  padding: 15px 16px; display: flex; gap: 12px; box-shadow: var(--sh-1);
+  transition: box-shadow var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+.insight-card:hover { box-shadow: var(--sh-2); transform: translateY(-1px); }
+.insight-ico {
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: var(--accent-tint); color: var(--accent);
+}
+.insight-ico.pos { background: var(--pos-soft); color: var(--pos); }
+.insight-ico.neg { background: var(--neg-soft); color: var(--neg); }
+.insight-ico.accent { background: var(--accent-tint); color: var(--accent); }
+.insight-head { font-weight: 600; font-size: 13.5px; letter-spacing: -0.01em; color: var(--text-1); line-height: 1.25; }
+.insight-sub { font-size: 12px; color: var(--text-3); margin-top: 3px; line-height: 1.45; }
+
+/* Monthly budget vs actual */
+.budget-row { display: flex; align-items: baseline; gap: 7px; margin-bottom: 10px; }
+.budget-spent { font-family: var(--font-display); font-size: 30px; font-weight: 400; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.budget-spent.neg { color: var(--neg); }
+.budget-track { height: 10px; background: rgba(42,35,86,0.07); border-radius: 999px; overflow: hidden; }
+.budget-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 500ms var(--ease); }
+.budget-fill.warn { background: var(--warn); }
+.budget-fill.over { background: var(--neg); }
+
+/* Monthly calendar: prev/next nav + centered grid */
+.cal-nav { display: flex; gap: 4px; align-items: center; }
+.cal-nav .icon-btn { font-size: 20px; line-height: 1; font-weight: 500; }
+.cal-nav .icon-btn[disabled] { opacity: 0.35; cursor: not-allowed; }
+.heatmap-svg { display: block; margin: 8px auto 0; }
+.heat-foot { justify-content: center; gap: var(--s-6); }
+
+/* Spending-tracker "By category" donut + legend */
+.donut-wrap {
+  display: grid; grid-template-columns: auto 1fr;
+  gap: var(--s-6); align-items: center;
+  padding: var(--s-4) var(--s-5) var(--s-5);
+}
+@media (max-width: 560px) { .donut-wrap { grid-template-columns: 1fr; justify-items: center; } }
+
+/* Dashed "Spin up a new group" prompt card */
+.new-group-card {
+  background: var(--surface-2);
+  border: 1.5px dashed var(--line-strong);
+  display: flex; align-items: center; justify-content: center;
+  min-height: 260px; cursor: pointer; box-shadow: none;
+}
+.new-group-card:hover { border-color: var(--accent); background: var(--accent-tint); transform: none; }
+.ngp-inner { text-align: center; padding: var(--s-5); }
+.ngp-plus {
+  display: inline-grid; place-items: center;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--accent); color: #fff; font-size: 22px; font-weight: 400;
+  margin-bottom: 12px; line-height: 1;
+}
+.ngp-title { font-family: var(--font-display); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.ngp-sub { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+
+/* Group-detail header */
+.detail-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-4); margin-bottom: var(--s-4);
+}
+.detail-back { font-size: 13px; color: var(--text-3); font-weight: 500; }
+.detail-back:hover { color: var(--accent); }
+
+.group-hero {
+  position: relative; height: 200px; border-radius: var(--r-5);
+  overflow: hidden; margin-bottom: var(--s-5);
+}
+.group-hero-cover { position: absolute; inset: 0; }
+.group-hero-cover svg { width: 100%; height: 100%; display: block; }
+.group-hero-veil {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0) 35%, rgba(0,0,0,0.42));
+}
+.group-hero-content {
+  position: absolute; left: var(--s-6); right: var(--s-6); bottom: var(--s-5);
+  color: #fff;
+}
+.group-hero-eyebrow {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; opacity: 0.88; margin-bottom: 6px;
+}
+.group-hero-title {
+  font-family: var(--font-display); font-size: 40px; font-weight: 400;
+  letter-spacing: -0.025em; line-height: 1; color: #fff;
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-2);
+  padding: 2px 6px; margin-left: -6px; width: 100%; max-width: 560px;
+}
+.group-hero-title:hover { background: rgba(255,255,255,0.10); }
+.group-hero-title:focus { background: rgba(0,0,0,0.18); border-color: rgba(255,255,255,0.4); outline: none; }
+.group-hero-title::placeholder { color: rgba(255,255,255,0.6); }
+.group-hero-avatars {
+  position: absolute; right: var(--s-6); bottom: var(--s-5);
+}
+.group-hero-avatars .avatar { box-shadow: 0 0 0 2px rgba(255,255,255,0.85); }
+@media (max-width: 880px) {
+  .group-hero { height: 168px; }
+  .group-hero-title { font-size: 30px; }
+  .group-hero-avatars { display: none; }
+}
+
+/* ---- Topbar brand: shown on mobile (where sidebar is hidden), hidden on
+   desktop. Base = visible; desktop hide via min-width so source order can't
+   let a later `display:none` win over the ≤920 rule. ---- */
+.topbar-brand { display: inline-flex; align-items: center; gap: 9px; color: var(--text-1); }
+@media (min-width: 921px) { .topbar-brand { display: none; } }
+.topbar-brand .brand-mark { width: 26px; height: 26px; flex-shrink: 0; }
+.topbar-brand .brand-mark svg { width: 100%; height: 100%; }
+.topbar-brand .brand-name {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: 18px; letter-spacing: -0.02em;
+}
+
+/* ---- Sidebar brand (wordmark now lives atop the sidebar) ---- */
+.sidebar-brand {
+  display: flex; align-items: center; gap: 11px;
+  padding: 16px 14px 10px; text-decoration: none; color: var(--text-1);
+}
+.sidebar-brand-mark {
+  width: 28px; height: 28px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sidebar-brand-mark svg { width: 100%; height: 100%; }
+.sidebar-brand-name {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: 19px; letter-spacing: -0.02em;
+}
+
+/* ---- Accent (indigo) button — sidebar New expense ---- */
+.btn.btn-accent {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.btn.btn-accent:hover { background: var(--accent-2); border-color: var(--accent-2); box-shadow: var(--sh-2); }
+
+/* ---- Sidebar group rows (emoji chip + balance badge) ---- */
+.group-emoji {
+  width: 18px; height: 18px; border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0;
+  font-family: var(--font-ui); line-height: 1;
+}
+.group-bal {
+  margin-left: auto; font-size: 11.5px; font-weight: 500;
+  font-variant-numeric: tabular-nums; color: var(--text-disabled);
+}
+.group-bal.pos { color: var(--pos); }
+.group-bal.neg { color: var(--neg); }
+.group-bal.zero { color: var(--text-disabled); }
+.nav-groups .nav-item { font-weight: 400; }
+
+/* ============================================================
+   MOBILE FIXES PASS (≤640px) — make every screen phone-friendly
+   ============================================================ */
+@media (max-width: 640px) {
+  /* --- Tables become stacked cards (money columns now visible) --- */
+  .tbl-wrap { overflow-x: visible; }
+  .tbl:not(.matrix) thead { display: none; }
+  .tbl:not(.matrix), .tbl:not(.matrix) tbody, .tbl:not(.matrix) tr, .tbl:not(.matrix) td { display: block; width: auto; }
+  .tbl:not(.matrix) tr { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 0 0 10px; background: var(--surface-1); box-shadow: var(--sh-1); }
+  .tbl:not(.matrix) tbody tr:hover, .tbl:not(.matrix) tbody tr:hover td { background: var(--surface-1); }
+  .tbl:not(.matrix) td { border: none !important; padding: 5px 0; display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: right; font-size: 13.5px; }
+  .tbl:not(.matrix) td[data-label]::before { content: attr(data-label); color: var(--text-3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; text-align: left; flex-shrink: 0; }
+  .tbl:not(.matrix) td.mcol-hide { display: none; }
+  .tbl:not(.matrix) td.mcol-title { padding: 0 0 9px; margin-bottom: 5px; border-bottom: 1px solid var(--line-soft) !important; }
+  .tbl:not(.matrix) td.mcol-title .desc-cell { text-align: left; }
+  .tbl:not(.matrix) td.mcol-actions { justify-content: flex-end; padding-top: 9px; gap: 8px; }
+  .tbl:not(.matrix) td.col-amt { font-size: 14px; }
+  .col-amt.pos, .col-amt.neg { font-variant-numeric: tabular-nums; }
+
+  /* =====================================================================
+     COMPACT EXPENSE ROWS — collapse the 5-row label/value stack into a
+     two-line card (title + your-share on top, meta + total below), the
+     way Splitwise/pro apps pack a feed. Scoped to .tbl-expense so settle/
+     member/other collapsed tables keep the readable label/value layout.
+     ===================================================================== */
+  .tbl-expense:not(.matrix) tr {
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    padding: 11px 14px; column-gap: 8px; row-gap: 3px;
+  }
+  /* line 1 — description is the headline, share is the figure that matters.
+     The title grows (flex 1 1 auto) to fill the line, which forces the
+     meta chips to wrap onto line 2 — no explicit break element needed. */
+  .tbl-expense:not(.matrix) td.mcol-title {
+    order: 0; flex: 1 1 auto; min-width: 0;
+    padding: 0; margin: 0; border: 0 !important;
+  }
+  .tbl-expense:not(.matrix) td.mcol-title .title { font-size: 15px; font-weight: 600; line-height: 1.25; }
+  .tbl-expense:not(.matrix) td.mcol-title .note  { font-size: 11.5px; margin-top: 1px; }
+  .tbl-expense:not(.matrix) td[data-label="Your share"] {
+    order: 1; flex: 0 0 auto;
+    padding: 0; font-size: 15px; font-weight: 700;
+  }
+  .tbl-expense:not(.matrix) td[data-label="Your share"]::before { display: none; }
+  /* line 2 — meta chips: date · group/category · paid-by (small, muted) */
+  .tbl-expense:not(.matrix) td.col-date,
+  .tbl-expense:not(.matrix) td[data-label="Group"],
+  .tbl-expense:not(.matrix) td[data-label="Category"],
+  .tbl-expense:not(.matrix) td[data-label="Paid by"] {
+    order: 3; flex: 0 0 auto; width: auto;
+    padding: 0; gap: 5px; justify-content: flex-start;
+    font-size: 12px; color: var(--text-3); text-align: left;
+  }
+  .tbl-expense:not(.matrix) td.col-date::before,
+  .tbl-expense:not(.matrix) td[data-label="Group"]::before,
+  .tbl-expense:not(.matrix) td[data-label="Category"]::before,
+  .tbl-expense:not(.matrix) td[data-label="Paid by"]::before { display: none; }
+  /* middot between meta chips (not before the first one) */
+  .tbl-expense:not(.matrix) td.col-date ~ td[data-label="Group"]::before,
+  .tbl-expense:not(.matrix) td.col-date ~ td[data-label="Category"]::before,
+  .tbl-expense:not(.matrix) td.col-date ~ td[data-label="Paid by"]::before {
+    content: "·"; display: inline; color: var(--ink-faint); margin-right: 3px; font-weight: 400; font-size: 12px; letter-spacing: 0;
+  }
+  /* shrink the paid-by avatar to a meta-line dot */
+  .tbl-expense:not(.matrix) td[data-label="Paid by"] .avatar { width: 16px; height: 16px; font-size: 8px; }
+  /* category pill flattens to plain text on the meta line */
+  .tbl-expense:not(.matrix) td[data-label="Category"] .cat { background: none !important; padding: 0; color: var(--text-3); font-weight: 500; }
+  /* line 2 — total, pinned right, muted */
+  .tbl-expense:not(.matrix) td[data-label="Amount"] {
+    order: 4; flex: 0 0 auto; margin-left: auto;
+    padding: 0; font-size: 12.5px; font-weight: 500; color: var(--text-3);
+  }
+  .tbl-expense:not(.matrix) td[data-label="Amount"]::before {
+    content: "total"; color: var(--text-3); opacity: 0.7;
+    font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 5px;
+  }
+  /* row tap opens the edit modal (which has Delete) — drop inline actions */
+  .tbl-expense:not(.matrix) td.mcol-actions { display: none; }
+
+  /* --- Stack analytics/trip multi-panel footers --- */
+  .trip-foot { flex-direction: column; align-items: stretch; gap: 1px; }
+  .trip-foot .trip-panel { width: 100%; }
+  .trip-body { grid-template-columns: 1fr; }
+
+  /* --- Card header + its segmented toggle / range pill stack --- */
+  .card-header { flex-wrap: wrap; gap: 10px; }
+  .card-header > .seg, .card-header > .range-pill { width: 100%; }
+  .card-header > .seg button { flex: 1; }
+
+  /* --- Trip hero stacks; dates stay on one line --- */
+  .trip-hero-inner { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .trip-hero-right { text-align: left; }
+  .trip-meta-row { flex-wrap: wrap; row-gap: 4px; }
+  .trip-meta { white-space: nowrap; }
+  .trip-name { font-size: 22px; }
+  .trip-kpis { grid-template-columns: 1fr 1fr; }
+  .trip-kpis > .trip-kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  /* --- Groups: 2-up cards on phones (compact covers handle the squeeze) --- */
+  .group-grid { grid-template-columns: 1fr 1fr !important; }
+  .cover-card .gc-row { flex-wrap: wrap; gap: 8px 12px; }
+  .cover-card .gc-bal { white-space: nowrap; }
+  .gc-cover-tag { max-width: calc(100% - 16px); }
+
+  /* --- Don't let the floating tab bar cover content --- */
+  .main { padding-bottom: calc(118px + env(safe-area-inset-bottom)); }
+
+  /* --- Date filter labels (were blank dropdowns) --- */
+  .filter-date { width: 100%; }
+}
+
+/* Date-range filter labels (all widths) */
+.filter-date { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-3); }
+.filter-date .filter-input { width: auto; flex: 1; }
+
+/* No stray link underlines on card links / trip "Open →" */
+a.sub, .card-header a, .trip-hero a, .trip-meta a, .lg-row a { text-decoration: none; }
+
+/* Profile photo avatars (Google sign-in shows the real picture) */
+.avatar-photo { background-size: cover; background-position: center 30%; background-repeat: no-repeat; color: transparent !important; font-size: 0; }
+
+/* Clear active state on the mobile bottom nav — pill behind the icon */
+.tab-item.active { color: var(--accent); }
+.tab-item.active > svg { background: rgba(42,35,86,0.12); border-radius: 999px; padding: 4px 18px; box-sizing: content-box; }
+.tab-item.active > span { font-weight: 600; }
+
+/* Smart-split hint states + per-row unit */
+#splitSumHint { font-variant-numeric: tabular-nums; font-weight: 600; }
+#splitSumHint.hint-ok { color: #1E7F5C; }
+#splitSumHint.hint-warn { color: #A66A14; }
+#splitSumHint.hint-err { color: #C0392B; }
+.share-input { display: flex; align-items: center; gap: 5px; }
+.share-input .share-unit { color: var(--text-3, #6B6353); font-size: 13px; font-weight: 600; }
+
+/* Clickable KPI cards — clear they're tappable, on desktop + mobile */
+.kpi-link { cursor: pointer; }
+.kpi-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--r-card, 14px); }
+@media (hover: hover) { .kpi-link:hover { box-shadow: 0 14px 32px -10px rgba(26,24,20,0.22); } }
+.kpi-link:active { box-shadow: 0 6px 18px -8px rgba(26,24,20,0.22); }
+
+/* Bigger, clearer profile photo in the top-right (was tiny 22px) */
+.avatar-btn { padding: 0; }
+#meAvatar .avatar { width: 36px; height: 36px; font-size: 14px; }
+#meAvatar .avatar.avatar-photo { box-shadow: 0 0 0 2px #fff, 0 2px 9px rgba(10,10,15,0.18); }
+@media (max-width: 920px) { #meAvatar .avatar { width: 38px; height: 38px; } }
+
+/* ---- UI polish pass ---- */
+/* Group detail: never break the back link onto two lines */
+.detail-back { white-space: nowrap; }
+
+/* Logo mark and profile photo locked to the SAME 36px — exact 1:1 ratio */
+.topbar-brand .brand-mark { width: 36px; height: 36px; }
+.topbar-brand .brand-mark svg { width: 100%; height: 100%; display: block; }
+#meAvatar .avatar { width: 36px !important; height: 36px !important; }
+.sidebar-brand .sidebar-brand-mark { width: 36px; height: 36px; }
+
+/* Nudge the profile photo closer to the top-right corner on mobile */
+@media (max-width: 920px) {
+  .topbar { padding-right: var(--s-4); }
+}
+
+/* Settle rows: keep each meta fragment whole instead of breaking per word */
+.who-sub { flex-wrap: wrap; row-gap: 2px; }
+.who-sub > * { white-space: nowrap; }
+.who-name { flex-wrap: wrap; gap: 4px 6px; }
+
+/* "Owner" badge on member chips — makes group ownership unambiguous */
+.owner-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(42,35,86,0.10); color: var(--accent, #2A2356); font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+
+/* Group-detail toolbar: wrap so "+ Add expense" is never clipped on mobile */
+@media (max-width: 920px) {
+  .detail-top { flex-wrap: wrap; row-gap: 10px; }
+  .detail-top .detail-back { flex: 1 1 100%; }
+  .detail-top .actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
+}
+
+/* Clickable group stat cards (tap a number → its tab) */
+.stat-link { cursor: pointer; transition: box-shadow 150ms ease-out, transform 150ms ease-out; }
+.stat-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) { .stat-link:hover { box-shadow: 0 10px 26px -10px rgba(26,24,20,0.20); transform: translateY(-2px); } }
+
+/* Live "= ₹X" amount next to a share/percent input */
+.share-amt { color: var(--text-3, #6B6353); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.member-row .share-input { flex-wrap: wrap; justify-content: flex-end; }
+
+/* Brief confirm flash when a profile field auto-saves */
+.input.saved-flash { border-color: #1E7F5C !important; box-shadow: 0 0 0 3px rgba(30,127,92,0.18) !important; transition: box-shadow 220ms ease, border-color 220ms ease; }
+
+/* ============================================================
+   SPARK PASS (Jun 2026) — cohesive motion, depth & signature
+   polish across every screen. Editorial restraint, executed at a
+   higher craft level: gentle arrival motion, intentional hover
+   lift, the orbit motif echoed into empty states, refined chart +
+   nav detailing. All gated behind prefers-reduced-motion.
+   ============================================================ */
+
+/* --- Arrival: each screen settles in (gentle, opacity-led so sticky
+       headers don't jump). Replays on navigation = a soft sense of place. --- */
+@keyframes sparkFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes sparkRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.page { animation: sparkFade 280ms cubic-bezier(.22,1,.36,1) both; }
+
+/* Signature dashboard moment: the KPI tiles cascade up in sequence. */
+.kpi-grid .kpi { animation: sparkRise 460ms cubic-bezier(.22,1,.36,1) both; }
+.kpi-grid .kpi:nth-child(1){ animation-delay: 0ms; }
+.kpi-grid .kpi:nth-child(2){ animation-delay: 70ms; }
+.kpi-grid .kpi:nth-child(3){ animation-delay: 140ms; }
+.kpi-grid .kpi:nth-child(4){ animation-delay: 210ms; }
+
+/* --- Intentional hover lift (was a timid 1px). Cards feel pickable-up. --- */
+.card { transition: transform 200ms cubic-bezier(.22,1,.36,1), box-shadow 200ms ease-out; }
+@media (hover: hover) {
+  .kpi:hover { transform: translateY(-4px); box-shadow: var(--sh-3); }
+  .card:hover { transform: translateY(-2px); box-shadow: var(--sh-2); }
+  .group-card { transition: transform 200ms cubic-bezier(.22,1,.36,1), box-shadow 200ms ease-out; }
+  .group-card:hover { transform: translateY(-4px); box-shadow: var(--sh-3); }
+}
+/* The hero must not double-lift (its tilt handler owns transform). */
+.kpi.kpi-hero:hover { transform: none; }
+
+/* Hero balance card: a slow specular sheen drifts across — the kind of quiet
+   life premium fintech cards have. Sits above the gradient, below content. */
+.kpi.kpi-hero::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 40%;
+  background: linear-gradient(105deg, transparent, rgba(245,239,224,0.10) 50%, transparent);
+  transform: skewX(-16deg); pointer-events: none; z-index: 1;
+  animation: heroSheen 7.5s ease-in-out 1.2s infinite;
+}
+@keyframes heroSheen { 0% { left: -45%; } 55%, 100% { left: 130%; } }
+
+/* --- Buttons: a touch of press physics + primary glow on hover. --- */
+.btn { transition: transform 120ms ease-out, box-shadow 160ms ease-out, background 160ms ease-out, border-color 160ms ease-out; }
+.btn:active { transform: translateY(1px); }
+@media (hover: hover) { .btn-primary:hover { box-shadow: 0 8px 22px -10px rgba(42,35,86,0.55); } }
+
+/* --- Sidebar nav: an accent rail slides in on the active item. --- */
+.nav-item { position: relative; transition: background 150ms ease-out, color 150ms ease-out; }
+.nav-item::before {
+  content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%) scaleY(0);
+  width: 3px; height: 22px; border-radius: 0 3px 3px 0; background: var(--accent, #2A2356);
+  transition: transform 200ms cubic-bezier(.22,1,.36,1);
+}
+.nav-item.active::before, .nav-item[aria-current="page"]::before { transform: translateY(-50%) scaleY(1); }
+
+/* --- Table rows: a hairline accent ticks in on hover (ledger feel). --- */
+.tbl tbody tr { transition: background 140ms ease-out, box-shadow 140ms ease-out; }
+@media (hover: hover) { .tbl tbody tr:hover { box-shadow: inset 3px 0 0 var(--accent, #2A2356); } }
+
+/* --- Empty states: named, centered, with a faint orbit ring behind — the
+       brand motif doing double duty as illustration. --- */
+.empty {
+  text-align: center; padding: 44px 24px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220' fill='none'%3E%3Cg stroke='%232A2356' stroke-opacity='0.10'%3E%3Cellipse cx='110' cy='110' rx='90' ry='32' transform='rotate(-18 110 110)'/%3E%3Cellipse cx='110' cy='110' rx='62' ry='22' transform='rotate(-18 110 110)'/%3E%3Cellipse cx='110' cy='110' rx='34' ry='12' transform='rotate(-18 110 110)'/%3E%3C/g%3E%3Ccircle cx='110' cy='110' r='5' fill='%232A2356' fill-opacity='0.16'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: center 22px; background-size: 200px 200px;
+}
+.empty-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-2, #3A3A45); margin-top: 92px; }
+.empty-sub { font-size: 13px; color: var(--text-3, #6B6F7E); margin-top: 4px; }
+
+/* --- Charts: give the area line a subtle weight + smoother caps. --- */
+svg.chart .area-line { stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+svg.chart .area-fill { fill: url(#accent-grad); }
+
+/* --- Section titles: a small accent tick before the label. --- */
+.section-title { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  .page, .kpi-grid .kpi { animation: none !important; }
+  .kpi.kpi-hero::before { animation: none; display: none; }
+  .btn:active { transform: none; }
+}
+
+/* Faint accent glyph for otherwise-empty stat cards (no sparkline). */
+.kpi-ic { position: absolute; top: 18px; right: 18px; color: var(--accent, #2A2356); opacity: 0.16; z-index: 1; pointer-events: none; }
+.kpi-ic svg { display: block; }
+
+/* ============================================================
+   ★ LIVING FRIEND-ORBIT HERO (Jun 2026) — the signature moment.
+   A dark "cosmos" band: you are the glowing core, friends orbit
+   as planets (green = owes you, red = you owe), sized by amount,
+   slowly rotating, hover for detail, click to settle.
+   ============================================================ */
+.orbit-hero {
+  position: relative; overflow: hidden;
+  display: grid; grid-template-columns: 1fr 360px; align-items: center; gap: var(--s-5);
+  min-height: 300px; padding: 32px 36px;
+  border-radius: var(--r-5);
+  background:
+    radial-gradient(130% 130% at 86% 18%, rgba(96,82,170,0.55), transparent 58%),
+    radial-gradient(90% 90% at 8% 92%, rgba(166,106,20,0.20), transparent 55%),
+    linear-gradient(140deg, #14112C 0%, #241C4E 46%, #100D24 100%);
+  color: #F5EFE0; border: 1px solid rgba(245,239,224,0.08);
+  box-shadow: 0 24px 60px -28px rgba(20,17,44,0.9), var(--sh-3);
+}
+.orbit-stars { position: absolute; inset: 0; pointer-events: none; opacity: 0.7;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 22%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1.2px 1.2px at 28% 72%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 52% 16%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 68% 84%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 90% 40%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1.2px 1.2px at 40% 50%, rgba(255,255,255,0.4), transparent);
+}
+.orbit-hero-text { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 6px; }
+.orbit-hero .kpi-label { color: rgba(245,239,224,0.6); letter-spacing: 0.12em; margin-bottom: 8px; }
+.orbit-hero .kpi-head { gap: 12px; }
+.orbit-hero .kpi-value { font-family: var(--font-display); font-size: 54px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; color: #fff; margin: 2px 0 6px; }
+.orbit-hero .kpi-delta { color: rgba(245,239,224,0.72); font-size: 13.5px; }
+.orbit-hero .kpi-tag { background: rgba(245,239,224,0.14); color: rgba(245,239,224,0.92); }
+.orbit-cta { align-self: flex-start; margin-top: 16px; gap: 8px; background: rgba(245,239,224,0.12); color: #fff; border: 1px solid rgba(245,239,224,0.22); }
+.orbit-cta:hover { background: rgba(245,239,224,0.22); transform: translateY(-1px); }
+
+.orbit-stage-wrap { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; height: 300px; }
+.orbit-stage { position: relative; width: 300px; height: 300px; }
+.orbit-track { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 1px dashed rgba(245,239,224,0.13); border-radius: 50%; }
+
+.orbit-core {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 58px; height: 58px; border-radius: 50%; z-index: 3;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; color: #fff; font-size: 17px; background-size: cover; background-position: center;
+  background-image: radial-gradient(circle at 35% 30%, #9A8CE6, #4A3F8A);
+  animation: corePulse 3.6s ease-in-out infinite;
+}
+.orbit-core.has-photo { color: transparent; }
+@keyframes corePulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(150,134,230,0.20), 0 0 26px 5px rgba(150,134,230,0.45); }
+  50%      { box-shadow: 0 0 0 7px rgba(150,134,230,0.28), 0 0 42px 11px rgba(150,134,230,0.66); }
+}
+.orbit-core-label { position: absolute; left: 50%; top: calc(50% + 42px); transform: translateX(-50%); z-index: 3;
+  font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245,239,224,0.5); }
+
+@keyframes orbitspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes planetUpright { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+.orbiter { position: absolute; left: 50%; top: 50%; pointer-events: none;
+  animation: orbitspin linear infinite; }
+.planet { position: absolute; top: 0; left: 50%; transform-origin: 50% 50%;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%;
+  font-weight: 700; color: #fff; cursor: pointer; pointer-events: auto;
+  box-shadow: 0 5px 16px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.25);
+  animation: planetUpright linear infinite reverse;
+  transition: filter 150ms ease, box-shadow 150ms ease;
+}
+.planet.owed { background: radial-gradient(circle at 35% 28%, #44DDA2, #1E8A63); }
+.planet.owe  { background: radial-gradient(circle at 35% 28%, #FF9385, #C0392B); }
+.planet:hover, .planet:focus-visible { filter: brightness(1.14); box-shadow: 0 8px 22px rgba(0,0,0,0.5), 0 0 0 3px rgba(245,239,224,0.4); outline: none; z-index: 6; }
+.planet-tip {
+  position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%);
+  background: rgba(16,13,34,0.97); border: 1px solid rgba(245,239,224,0.18); color: #F5EFE0;
+  padding: 6px 11px; border-radius: 9px; white-space: nowrap; display: flex; flex-direction: column; gap: 1px;
+  font-weight: 500; font-size: 11px; opacity: 0; pointer-events: none; transition: opacity 140ms ease; z-index: 8;
+  box-shadow: 0 10px 26px -8px rgba(0,0,0,0.6);
+}
+.planet-tip strong { font-size: 12px; font-weight: 700; }
+.planet:hover .planet-tip, .planet:focus-visible .planet-tip { opacity: 1; }
+
+.orbit-hero.is-clear .orbit-core { animation-duration: 4.4s; }
+
+@media (max-width: 920px) {
+  .orbit-hero { grid-template-columns: 1fr; text-align: center; padding: 26px 20px; }
+  .orbit-hero-text { align-items: center; }
+  .orbit-cta { align-self: center; }
+  .orbit-stage-wrap, .orbit-stage { width: 260px; height: 260px; margin: 0 auto; }
+  .orbit-hero .kpi-value { font-size: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbiter, .planet, .orbit-core { animation-play-state: paused; }
+}
+
+/* ============================================================
+   DUAL THEME (Jun 2026) — two directions from the Claude Design
+   exploration:
+     • LIGHT  = "Editorial Warmth" — cream canvas, AUBERGINE hero,
+       Spectral serif numerals. Refines the current Orbit DNA.
+     • DARK   = "Midnight Aurora" — near-black canvas, glass panels,
+       neon mint accent, violet→mint glow, mono numerals.
+   Toggle in the topbar; persisted; honors OS preference on first run.
+   ============================================================ */
+
+/* ---- Numeral font: serif in light, mono in dark (the signature
+        difference between the two directions) ---- */
+:root, [data-theme="light"] { --font-num: 'Spectral', Georgia, 'Times New Roman', serif; }
+.kpi-value, .orbit-hero .kpi-value, .gc-bal, .stat-value {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Editorial Warmth — aubergine hero (deeper, warmer than the indigo). */
+[data-theme="light"] .orbit-hero {
+  background:
+    radial-gradient(130% 130% at 86% 14%, rgba(178,108,170,0.42), transparent 56%),
+    radial-gradient(80% 92% at 6% 98%, rgba(166,106,20,0.20), transparent 55%),
+    linear-gradient(140deg, #3A2347 0%, #4C2C57 46%, #2A1838 100%);
+}
+
+/* Smooth cross-theme transition on the big surfaces. */
+body, .card, .kpi, .sidebar, .topbar, .modal, .orbit-hero,
+.input, .select, .textarea { transition: background-color 260ms ease, border-color 260ms ease, color 260ms ease; }
+
+/* Theme-toggle icon: moon in light (→ go dark), sun in dark (→ go light). */
+.theme-toggle { padding: 0 9px; }
+.theme-toggle .ico-sun { display: none; }
+.theme-toggle .ico-moon { display: block; }
+[data-theme="dark"] .theme-toggle .ico-sun { display: block; }
+[data-theme="dark"] .theme-toggle .ico-moon { display: none; }
+
+/* ============================================================
+   MIDNIGHT AURORA — dark tokens
+   ============================================================ */
+[data-theme="dark"] {
+  --bg:               #0C0B16;
+  --bg-2:             #14121F;
+  --bg-sidebar:       #0A0912;
+  --bg-topbar:        rgba(12,11,22,0.82);
+  --surface-1:        rgba(255,255,255,0.043);   /* glass card */
+  --surface-2:        rgba(255,255,255,0.06);
+  --surface-3:        rgba(255,255,255,0.10);
+
+  --text-1:           #F1EEFB;
+  --text-2:           #C7C3DA;
+  --text-3:           #8A87A6;
+  --text-disabled:    #615E7E;
+  --ink-faint:        #423F58;
+
+  --line:             rgba(255,255,255,0.09);
+  --line-strong:      rgba(255,255,255,0.17);
+  --line-soft:        rgba(255,255,255,0.06);
+
+  --accent:           #4FE3B0;                    /* mint aurora */
+  --accent-2:         #A78BFA;                    /* violet */
+  --accent-3:         rgba(79,227,176,0.16);
+  --accent-soft:      rgba(79,227,176,0.14);
+  --accent-tint:      rgba(79,227,176,0.12);
+  --accent-tint-strong: rgba(79,227,176,0.22);
+  --accent-glow:      rgba(79,227,176,0.42);
+  --accent-line:      rgba(79,227,176,0.30);
+  --accent-on:        #06231A;                    /* dark ink on mint */
+
+  --pos:              #4FE3B0;  --pos-soft: rgba(79,227,176,0.14);
+  --neg:              #FB7185;  --neg-soft: rgba(251,113,133,0.14);
+  --warn:             #FBBF6B;  --warn-soft: rgba(251,191,107,0.14);
+  --info:             #7CA8E0;  --info-soft: rgba(124,168,224,0.14);
+
+  --cat-food:#FBBF6B; --cat-travel:#5BD1E0; --cat-bills:#A78BFA; --cat-shop:#FB7185;
+  --cat-fun:#F0A6E0; --cat-rent:#4FE3B0; --cat-transport:#7CA8E0; --cat-other:#8A87A6;
+
+  --sh-1: 0 1px 2px rgba(0,0,0,0.45);
+  --sh-2: 0 8px 24px -6px rgba(0,0,0,0.6);
+  --sh-3: 0 16px 42px -8px rgba(0,0,0,0.72);
+  --sh-4: 0 30px 70px -14px rgba(0,0,0,0.8);
+  --sh-iris: 0 14px 40px -10px rgba(79,227,176,0.28), 0 4px 12px rgba(0,0,0,0.5);
+  --sh-pillow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 14px -4px rgba(0,0,0,0.6);
+
+  --font-ui:      'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-num:     'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ---- Dark surfaces: glass panels ---- */
+[data-theme="dark"] body { color: var(--text-1); }
+[data-theme="dark"] .card,
+[data-theme="dark"] .kpi {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: var(--sh-1), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+[data-theme="dark"] .card-header,
+[data-theme="dark"] .card-foot { border-color: var(--line); }
+@media (hover: hover) {
+  [data-theme="dark"] .kpi:hover,
+  [data-theme="dark"] .group-card:hover { box-shadow: var(--sh-3), 0 0 0 1px var(--accent-line); }
+}
+
+/* Topbar / sidebar glass on dark. */
+[data-theme="dark"] .topbar { -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid var(--line); }
+[data-theme="dark"] .sidebar { background: var(--bg-sidebar); border-right: 1px solid var(--line); }
+[data-theme="dark"] .nav-item:hover { background: var(--surface-2); }
+[data-theme="dark"] .nav-item.active, [data-theme="dark"] .nav-item[aria-current="page"] { background: var(--accent-tint); color: var(--accent); }
+
+/* Inputs / selects on dark. */
+[data-theme="dark"] .input, [data-theme="dark"] .select, [data-theme="dark"] .textarea,
+[data-theme="dark"] .filter-input, [data-theme="dark"] .search {
+  background: var(--surface-2); border-color: var(--line); color: var(--text-1);
+}
+[data-theme="dark"] .search input { color: var(--text-1); }
+
+/* Primary / accent buttons: mint with dark ink + glow. */
+[data-theme="dark"] .btn-primary, [data-theme="dark"] .btn-accent {
+  background: linear-gradient(135deg, #4FE3B0, #38BD92);
+  color: #06231A; border: none;
+  box-shadow: 0 6px 20px -6px rgba(79,227,176,0.5);
+}
+[data-theme="dark"] .btn-primary:hover, [data-theme="dark"] .btn-accent:hover { box-shadow: 0 10px 26px -6px rgba(79,227,176,0.6); }
+[data-theme="dark"] .btn { color: var(--text-1); }
+[data-theme="dark"] .btn-ghost { background: var(--surface-1); border-color: var(--line); }
+
+/* Modals: solid glass (surface-1 alone is too sheer to read over content). */
+[data-theme="dark"] .modal { background: #16142A; border: 1px solid var(--line); }
+[data-theme="dark"] .modal-head, [data-theme="dark"] .modal-foot { border-color: var(--line); }
+[data-theme="dark"] .modal-backdrop { background: rgba(6,5,12,0.66); }
+
+/* Tables on dark. */
+[data-theme="dark"] .tbl th { background: var(--surface-2); color: var(--text-3); }
+[data-theme="dark"] .tbl tr:hover td { background: var(--surface-2); }
+[data-theme="dark"] .tbl td, [data-theme="dark"] .tbl th { border-color: var(--line); }
+
+/* ---- Midnight Aurora hero ---- */
+[data-theme="dark"] .orbit-hero {
+  background:
+    radial-gradient(120% 150% at 80% -10%, rgba(167,139,250,0.34), transparent 56%),
+    radial-gradient(90% 95% at 8% 105%, rgba(79,227,176,0.16), transparent 55%),
+    #100E1E;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 28px 70px -30px #000;
+}
+[data-theme="dark"] .orbit-track { border-color: rgba(255,255,255,0.10); }
+[data-theme="dark"] .orbit-core { background-image: radial-gradient(circle at 35% 30%, #B6A6FF, #6D5BC9); }
+[data-theme="dark"] .planet.owed { box-shadow: 0 0 20px rgba(79,227,176,0.55), inset 0 1px 0 rgba(255,255,255,0.3); }
+[data-theme="dark"] .planet.owe  { box-shadow: 0 0 20px rgba(251,113,133,0.5), inset 0 1px 0 rgba(255,255,255,0.3); }
+
+/* Analytics hero card on dark = aurora glass. */
+[data-theme="dark"] .kpi.kpi-hero {
+  background:
+    radial-gradient(120% 140% at 82% 0%, rgba(167,139,250,0.30), transparent 55%),
+    #14121F;
+  border: 1px solid var(--line);
+}
+
+/* ---- Charts: neon glow line on dark ---- */
+[data-theme="dark"] svg.chart .area-line { filter: drop-shadow(0 0 6px rgba(79,227,176,0.55)); }
+[data-theme="dark"] svg.chart .grid line { stroke: rgba(255,255,255,0.07); }
+[data-theme="dark"] svg.chart .label, [data-theme="dark"] svg.chart text { fill: var(--text-3); }
+
+/* ---- Background layers on dark: aurora glow, faint grid, screen-blend grain ---- */
+[data-theme="dark"] .bg-mesh {
+  background:
+    radial-gradient(1000px 720px at 6% -8%, rgba(167,139,250,0.16), transparent 56%),
+    radial-gradient(920px 660px at 102% 6%, rgba(79,227,176,0.11), transparent 58%),
+    radial-gradient(1100px 780px at 50% 118%, rgba(167,139,250,0.10), transparent 60%);
+}
+[data-theme="dark"] .bg-grid { background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); opacity: 0.5; }
+[data-theme="dark"] .bg-grain { mix-blend-mode: screen; opacity: 0.35; }
+
+/* Empty-state orbit illustration → light strokes on dark. */
+[data-theme="dark"] .empty {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220' fill='none'%3E%3Cg stroke='%234FE3B0' stroke-opacity='0.16'%3E%3Cellipse cx='110' cy='110' rx='90' ry='32' transform='rotate(-18 110 110)'/%3E%3Cellipse cx='110' cy='110' rx='62' ry='22' transform='rotate(-18 110 110)'/%3E%3Cellipse cx='110' cy='110' rx='34' ry='12' transform='rotate(-18 110 110)'/%3E%3C/g%3E%3Ccircle cx='110' cy='110' r='5' fill='%234FE3B0' fill-opacity='0.3'/%3E%3C/svg%3E");
+}
+
+/* Settle-now panel green wash → mint glass on dark. */
+[data-theme="dark"] .right-col .card:first-child {
+  background: radial-gradient(circle at 8% 0%, rgba(79,227,176,0.10), transparent 60%), var(--surface-1);
+}
+
+/* Avatar ring contrast on dark. */
+[data-theme="dark"] .avatar { box-shadow: 0 0 0 1.5px var(--bg); }
+
+/* Brand wordmark + misc ink that was hard-set for paper. */
+[data-theme="dark"] .brand-name, [data-theme="dark"] .sidebar-brand-name { color: var(--text-1); }
+
+/* ---- Dark fixes: components that hardcoded light button/track/bar values ---- */
+[data-theme="dark"] .btn { color: var(--text-1); }
+[data-theme="dark"] .btn-ghost:hover { background: var(--surface-2); color: var(--text-1); }
+[data-theme="dark"] .btn-pay { background: linear-gradient(135deg, #4FE3B0, #38BD92); color: #06231A; }
+[data-theme="dark"] .btn-pay:hover { background: #4FE3B0; }
+[data-theme="dark"] .btn-mark { background: rgba(255,255,255,0.08); color: var(--text-1); }
+[data-theme="dark"] .btn-mark:hover { background: rgba(255,255,255,0.15); }
+[data-theme="dark"] .btn-wa { color: #25D366; }
+[data-theme="dark"] .hbar-track { background: rgba(255,255,255,0.09); }
+[data-theme="dark"] svg.chart .bar { fill: rgba(255,255,255,0.14); }
+[data-theme="dark"] svg.chart .bar.on { fill: #4FE3B0; }
+[data-theme="dark"] .trip-card, [data-theme="dark"] .trip-kpi, [data-theme="dark"] .trip-panel,
+[data-theme="dark"] .insight-card {
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+}
+[data-theme="dark"] .trip-card, [data-theme="dark"] .insight-card { border: 1px solid var(--line); }
+
+/* =====================================================================
+   DENSITY PASS (Jun 2026) — tighten real-estate, kill dead whitespace
+   Theme-agnostic spacing. Wins by source order. Tune/remove as a unit.
+   ===================================================================== */
+
+/* Content frame — less air around the page */
+.main { padding: var(--s-4) var(--s-6) var(--s-6) var(--s-4); }
+.page { max-width: 1480px; }
+.page-header { margin-bottom: var(--s-5); }
+.title-block .sub { margin-top: 4px; }
+
+/* KPI cards — drop the forced 150px floor, snug the padding */
+.kpi { min-height: 0; padding: 16px 18px; }
+.kpi.kpi-hero { min-height: 0; padding: 20px 24px; }
+.kpi-grid { gap: var(--s-3); margin-bottom: var(--s-5); }
+.kpi-value { line-height: 1.04; }
+
+/* Cards — tighter chrome + body */
+.card-header { padding: var(--s-3) var(--s-4); }
+.card-body   { padding: var(--s-4); }
+.card-foot   { padding: var(--s-3) var(--s-4); }
+
+/* Grids & columns — close the gaps */
+.grid-2,
+.grid-2.content-grid { gap: var(--s-4); }
+.right-col { gap: var(--s-4); }
+.grid-cols-3, .grid-cols-4 { gap: var(--s-3); }
+
+/* Section rhythm */
+.section-title { margin-bottom: var(--s-2); }
+
+/* Tables & rows — denser lines */
+.tbl th, .tbl td { padding: 9px 14px; }
+
+/* Empty states — don't push content half a screen down */
+.empty { padding: 28px 24px; }
+.empty-title { margin-top: 20px; }
+
+/* Orbit hero — compact the signature band: smaller ring, pull the
+   graphic in from the far edge so the middle isn't a dead purple void */
+.orbit-hero { min-height: 0; padding: 22px 28px; grid-template-columns: 1fr 280px; gap: var(--s-4); }
+.orbit-stage-wrap { height: 256px; }
+.orbit-stage { width: 256px; height: 256px; }
+.orbit-hero .kpi-value { font-size: 46px; }
+.orbit-cta { margin-top: 12px; }
+
+/* Trip hero blocks — trim pad */
+.trip-hero  { padding: 20px 24px; }
+.trip-panel { padding: 16px; }
+
+@media (max-width: 920px) {
+  .main { padding: var(--s-3) var(--s-4) var(--s-5); }
+  .page-header { margin-bottom: var(--s-4); }
+}
+
+/* =====================================================================
+   MOBILE HERO FIX (Jun 2026) — the density pass re-applied a 2-column
+   grid to .orbit-hero AFTER the 920px collapse, so on phones the hero
+   never stacked: the orbit ring spilled off the right edge and the
+   squeezed text column wrapped the balance onto two lines. Re-assert the
+   single-column layout here at the foot so it wins on source order.
+   Planet radii are fixed px (set in app.js), so the stage size stays
+   fixed — never scale it with vw or the planets clip asymmetrically.
+   ===================================================================== */
+@media (max-width: 920px) {
+  .orbit-hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+    padding: 22px 20px;
+    gap: var(--s-3);
+  }
+  .orbit-hero-text { align-items: center; }
+  .orbit-cta { align-self: center; }
+  .orbit-stage-wrap, .orbit-stage {
+    width: 240px;
+    height: 240px;
+    margin: 0 auto;
+  }
+  /* keep the balance on one line — it's the first thing the eye lands on */
+  .orbit-hero .kpi-value {
+    font-size: clamp(32px, 9.5vw, 44px);
+    white-space: nowrap;
+  }
+}
+
+/* =====================================================================
+   MOBILE DENSITY PASS (Jun 2026) — condense every page on phones so the
+   app reads as a tight dashboard, not a tall single-column scroll.
+   Appended at the foot so it wins on source order over the earlier 920px
+   rules that forced every KPI / stat block into ONE column.
+     • "Rank" KPI + stat cards go 2-up (side by side), lose their tall
+       min-height and the sparkline foot that doubled their height.
+     • Recent-activity collapses to tight 2-line rows (title + meta, one
+       line each with ellipsis) and a smaller icon.
+     • Insight cards go 2-up; section gaps + card spacing tighten.
+   The orbit hero keeps the single-column treatment from the block above.
+   ===================================================================== */
+@media (max-width: 920px) {
+  /* --- Tighter page rhythm --- */
+  .page-header { margin-bottom: var(--s-3); }
+  .card { margin-bottom: var(--s-4); }
+
+  /* --- "Rank" KPI / stat cards: 2-up, compact --- */
+  .kpi-grid,
+  .kpi-grid.bal-row,
+  .kpi-grid.kpi-grid-3 {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+  }
+  /* An odd trailing card (e.g. the 3rd of a 3-up row) spans the full width
+     so it never sits lonely next to an empty cell. */
+  .kpi-grid > .kpi:nth-child(odd):last-child { grid-column: 1 / -1; }
+
+  .kpi { min-height: 0; padding: 14px 15px; }
+  .kpi-label { margin-bottom: 6px; font-size: 10px; letter-spacing: 0.08em; }
+  .kpi-value,
+  .kpi.kpi-hero .kpi-value { font-size: 24px; margin-bottom: 4px; }
+  /* The sparkline foot adds height for little payoff on a narrow 2-up card
+     — drop the graph, keep the one-line sub. */
+  .kpi-spark, .kpi-ic { display: none; }
+  .kpi-foot { padding-top: 6px; }
+  .kpi-foot-sub, .kpi-delta { font-size: 11.5px; }
+
+  /* --- Stat strips + insight cards 2-up (were 4-up until 560px) --- */
+  .stat-strip, .trip-kpis { grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
+  .stat-value { font-size: 19px; }
+  .insight-strip { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  .insight-card { padding: 12px 13px; }
+
+  /* --- Recent activity: tight 2-line rows --- */
+  .feed-row { grid-template-columns: 30px 1fr auto; gap: 10px; padding: 9px 14px; }
+  .feed-icon { width: 30px; height: 30px; border-radius: 9px; font-size: 12.5px; }
+  .feed-row .title {
+    font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .feed-row .meta {
+    font-size: 11px; margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .feed-row .amt { font-size: 13.5px; }
+  .feed-row .small { font-size: 11px; margin-top: 1px; }
+}
+
+@media (max-width: 560px) {
+  /* Smallest phones: insight text needs full width to breathe; the KPI rank
+     cards stay 2-up. */
+  .insight-strip { grid-template-columns: 1fr; }
+}
+
+/* =====================================================================
+   MOBILE HERO — TEXT LEFT, COMPLETE ORBIT RIGHT (Jun 2026)
+   Lay the hero out side-by-side on phones: the net-position text on the
+   left, the full friend-orbit graphic in a fixed narrow column on the
+   right, vertically centred against the text. The orbit shrinks via a
+   UNIFORM transform:scale (NOT by changing stage width — the planet radii
+   are fixed px in app.js, so scaling the box would clip them asymmetrically;
+   scale keeps tracks, planets and core all in proportion). The right
+   column's fixed width + overflow:hidden caps the grid track so the orbit
+   can never spill off the card edge (the original mobile overflow bug).
+   Last block in the file → wins source order over the earlier stacks.
+   ===================================================================== */
+@media (max-width: 920px) {
+  .orbit-hero {
+    grid-template-columns: 1fr 140px;
+    align-items: center;
+    text-align: left;
+    gap: var(--s-2);
+    padding: 18px 16px;
+    min-height: 0;
+  }
+  .orbit-hero-text { align-items: flex-start; }
+  .orbit-cta { align-self: flex-start; margin-top: 8px; }
+  .orbit-hero .kpi-value { font-size: clamp(24px, 7vw, 32px); white-space: nowrap; }
+
+  .orbit-stage-wrap { width: 140px; height: 150px; margin: 0; overflow: hidden; }
+  .orbit-stage { transform: scale(0.58); transform-origin: center; }
+}
+
+/* =====================================================================
+   MOBILE OVERFLOW + AVATAR PASS (Jun 2026)
+     • Group-detail .tabs was a non-wrapping flex row with no overflow
+       handling — 5 tabs blew past a phone's width and forced a horizontal
+       page scroll. Make it a swipeable strip (the standard mobile tab
+       pattern), scrollbar hidden. Same safety for segmented controls.
+     • Shrink the top-right profile avatar on phones (was locked to 36px
+       via !important elsewhere, so override needs !important too). Stays
+       pinned to the right of the topbar.
+   ===================================================================== */
+@media (max-width: 920px) {
+  /* Swipeable tab strip — no more horizontal page overflow */
+  .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; padding: 9px 12px; font-size: 13px; }
+
+  /* Segmented controls never push the layout wider than the screen */
+  .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .seg::-webkit-scrollbar { display: none; }
+
+  /* Smaller, tidier profile photo top-right */
+  #meAvatar .avatar { width: 30px !important; height: 30px !important; font-size: 12px; }
+  #meAvatar .avatar.avatar-photo { box-shadow: 0 0 0 1.5px #fff, 0 1px 5px rgba(10,10,15,0.16); }
+}
+
+/* =====================================================================
+   MOBILE GROUP CARDS + EXPENSE FILTERS (Jun 2026)
+     • Group cards go 2-up with a short cover banner (was 1-up with a
+       ~184px 16:9 cover — only one card per screen).
+     • Expense filter toolbar is collapsible behind a "Filters" toggle
+       (default collapsed) so it no longer buries the expense list; when
+       open, the selects + date pickers flow 2-up.
+   ===================================================================== */
+@media (max-width: 560px) {
+  .group-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  .group-cover { aspect-ratio: auto; height: 92px; }
+  .group-body { padding: var(--s-3); gap: var(--s-2); }
+  .cover-card .group-name { font-size: 15px; line-height: 1.15; }
+  .cover-card .gc-desc { font-size: 11px; }
+  .cover-card .gc-bal { font-size: 14px; }
+  .cover-card .gc-foot-row { font-size: 11px; }
+  .gc-cover-tag { font-size: 9px; padding: 2px 7px; top: 8px; left: 8px; }
+  .cover-card .gc-row { flex-wrap: wrap; gap: 6px; }
+}
+
+/* Collapsible filters — toggle is mobile-only; on desktop the toolbar
+   always shows and the toggle is hidden. */
+.filter-toggle { display: none; }
+@media (max-width: 920px) {
+  .filter-toggle {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 12px 14px; font-size: 13.5px; font-weight: 600; color: var(--text-1);
+    background: transparent; border: 0; cursor: pointer; text-align: left;
+  }
+  .filter-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+    background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
+  }
+  .filter-chev { color: var(--text-3); transition: transform 200ms ease; }
+  .filter-card.open .filter-chev { transform: rotate(180deg); }
+  .filter-card .filter-body { display: none; }
+  .filter-card.open .filter-body {
+    display: flex;
+    border: 0; box-shadow: none; background: transparent;
+    margin: 0; border-radius: 0; padding: 0 14px 14px;
+  }
+  /* When open, controls flow 2-up (search full width) */
+  .filter-card.open .filter-body input[type="search"].filter-input { width: 100% !important; flex: 1 1 100%; }
+  .filter-card.open .filter-body select.filter-input { flex: 1 1 calc(50% - 4px); width: auto !important; min-width: 0; }
+  .filter-card.open .filter-body .filter-date { flex: 1 1 calc(50% - 4px); width: auto; }
+}
+
+/* =====================================================================
+   DARK-MODE NAV + STUCK-TAP FIXES (Jun 2026)
+     • The floating bottom tab bar used --surface-1, which in dark mode is
+       rgba(255,255,255,0.043) (near-transparent) WITH backdrop-filter:none
+       — so page content bled straight through and the labels were unreadable.
+       Give it a near-opaque dark glass + restore the blur.
+     • On touch devices, :hover sticks after a tap, leaving a stray
+       background box on the topbar theme toggle (and other ghost buttons).
+       Neutralise hover backgrounds where the device can't actually hover.
+   ===================================================================== */
+[data-theme="dark"] .tabbar {
+  background: rgba(20, 18, 34, 0.92);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+@media (hover: none) {
+  .btn.btn-ghost:hover { background: transparent; box-shadow: none; }
+  [data-theme="dark"] .btn-ghost:hover { background: var(--surface-1); }
+}
+
+/* ============================================================
+   TOP-NAV REVAMP — primary Split/Money tabs + contextual sub-nav.
+   Replaces the left sidebar with a full-width top navigation.
+   ============================================================ */
+.app-shell {
+  grid-template-rows: var(--topbar-h) auto 1fr;
+  grid-template-columns: 1fr;
+}
+.sidebar { display: none !important; }
+.crumbs { display: none !important; }
+.main { grid-column: 1 / -1; grid-row: 3; padding: var(--s-5) var(--s-7) var(--s-7); }
+
+.nav-primary {
+  display: flex; gap: 2px; padding: 3px;
+  background: rgba(127,127,127,0.12); border-radius: 999px;
+}
+.nav-primary button {
+  border: none; background: transparent; cursor: pointer;
+  padding: 5px 16px; border-radius: 999px;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-2);
+  transition: all .15s ease;
+}
+.nav-primary button:hover { color: var(--text-1); }
+.nav-primary button.active {
+  background: var(--bg-1, #fff); color: var(--text-1);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+html[data-theme="dark"] .nav-primary button.active { background: rgba(255,255,255,0.14); }
+
+.subnav {
+  grid-column: 1 / -1; grid-row: 2;
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px var(--s-7); overflow-x: auto; scrollbar-width: none;
+  background: var(--bg-topbar); border-bottom: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+  position: sticky; top: var(--topbar-h); z-index: 9;
+}
+.subnav::-webkit-scrollbar { height: 0; }
+.subnav-item {
+  display: inline-flex; align-items: center; white-space: nowrap;
+  padding: 6px 14px; border-radius: 999px; text-decoration: none;
+  color: var(--text-2); font-size: 13px; font-weight: 500;
+  border: 1px solid transparent; transition: all .15s ease;
+}
+.subnav-item:hover { background: rgba(127,127,127,0.10); color: var(--text-1); }
+.subnav-item.active {
+  background: rgba(52,184,122,0.14); color: var(--text-1);
+  border-color: rgba(52,184,122,0.30); font-weight: 600;
+}
+@media (max-width: 720px) {
+  .subnav { padding: 6px 12px; }
+  .nav-primary button { padding: 5px 12px; }
+}
+
+/* ============================================================
+   MOBILE FIXES (batch 1) — restore mobile layout after the top-nav
+   revamp + responsive the finance screens. This block is last in the
+   file, so it wins the cascade.
+   ============================================================ */
+@media (max-width: 920px) {
+  /* The non-media .main rule (top-nav revamp) clobbered mobile padding —
+     restore tight padding, leave room for the bottom tab bar, kill h-scroll. */
+  .main {
+    padding: var(--s-4) 16px calc(76px + env(safe-area-inset-bottom)) !important;
+    overflow-x: hidden;
+  }
+  .page { max-width: 100% !important; }
+  #app, body { overflow-x: hidden; }
+
+  /* Every multi-column finance grid collapses to one column. */
+  .kpi-grid, .kpi-grid.bal-row, .kpi-grid.kpi-grid-3,
+  .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr !important; }
+
+  /* Page-header actions wrap instead of clipping the last button. */
+  .page-header .actions { flex-wrap: wrap; }
+  .page-header .actions .btn { flex: 1 1 140px; }
+
+  /* Primary Split/Money toggle: a touch smaller; brand word can hide. */
+  .nav-primary button { padding: 5px 12px; font-size: 13px; }
+  .topbar { padding: 0 12px; gap: 8px; }
+  .topbar-center { display: none; }            /* search is also on each list screen */
+}
+@media (max-width: 560px) {
+  /* Brand wordmark off on tiny screens to give the toggle + actions room. */
+  .topbar-brand .brand-name { display: none; }
+  .nav-primary { padding: 2px; }
+  .nav-primary button { padding: 5px 10px; }
+  /* Transaction filter selects: full width, stack cleanly. */
+  .card > select.select, .card .select { min-width: 0; }
+  .page-header h1 { font-size: 22px; }
+}
+
+/* ============================================================
+   MOBILE FIXES (batch 2) — touch targets + readability + sticky filters.
+   ============================================================ */
+@media (max-width: 920px) {
+  /* Comfortable touch targets (Apple HIG ~44px) */
+  .btn, .btn-sm, button.btn, select.select, .select,
+  input.input, input[type="text"], input[type="number"],
+  input[type="date"], input[type="search"], input[type="month"] { min-height: 44px; }
+  input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+  .subnav-item { min-height: 38px; padding-top: 9px; padding-bottom: 9px; }
+  .nav-primary button { min-height: 38px; }
+
+  /* Lift the smallest text to a legible floor (was 10–11px). */
+  .sub, .small, .muted, .kpi-label, .nav-label, .crumb,
+  .empty-sub, .section-title { font-size: 12px !important; }
+
+  /* Charts: cap height so they don't dominate a small screen. */
+  .chart-container { height: 220px !important; }
+}
+
+/* ============================================================
+   UI POLISH (intl-standard pass) — content width, sub-nav affordance.
+   ============================================================ */
+/* Centre content at a comfortable max width so desktop doesn't stretch a
+   single column across 1440px+ (cards stop bleeding off the right edge). */
+.page { max-width: 1180px; margin-left: auto; margin-right: auto; }
+
+/* Sub-nav: edge fade + snap so users sense there are more tabs to scroll. */
+.subnav { scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%);
+          mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%); }
+.subnav-item { scroll-snap-align: start; }
+
+/* Chart axis/label text (added by the new SVG charts). */
+.fin-axis text { font-size: 10px; fill: var(--text-3, #94a3b8); font-family: var(--font-ui, system-ui); }
+.fin-grid line { stroke: var(--line, rgba(127,127,127,0.18)); stroke-width: 1; }
+
+@media (max-width: 920px) {
+  /* Tighten the mobile header stack so content reaches the fold sooner. */
+  .page-header { gap: 8px !important; margin-bottom: 8px; }
+  .page-header h1 { font-size: 22px; }
+  .page-header .sub { display: none; }          /* drop the subtitle on phones */
+}
+
+/* ============================================================
+   UI POLISH 2 — card grids, 2-col desktop lists, ring/donut.
+   ============================================================ */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(264px, 1fr)); gap: var(--s-4); }
+/* Short list screens: flow rows into 2 columns on wide screens so they don't
+   leave half the canvas empty. Collapses to 1 column on tablet/mobile. */
+.fin-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--s-6); }
+@media (max-width: 760px) { .fin-2col { grid-template-columns: 1fr; } .card-grid { grid-template-columns: 1fr; } }
+
+/* ============================================================
+   UI FIX — sub-nav icons, collapsible filters (no transparent
+   sticky overlap), and finance empty-state (own icon, no orbit bg).
+   ============================================================ */
+/* Sub-nav items: leading icon + label, vertically centred. */
+.subnav-item { display: inline-flex; align-items: center; gap: 7px; }
+.subnav-ic { display: inline-flex; width: 16px; height: 16px; flex-shrink: 0; }
+.subnav-ic svg { width: 16px; height: 16px; display: block; stroke: currentColor; }
+
+/* Collapsible transaction filters. Desktop: facets inline, no toggle.
+   Mobile: facets hidden behind the "Filters" toggle (kept short, never sticky). */
+.txn-filters-body { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.txn-filters-body .select { width: auto; min-width: 132px; flex: 0 1 auto; }
+.txn-filter-top .input { flex: 1; }
+.txn-filter-toggle { display: none; }
+@media (max-width: 760px) {
+  .txn-filter-card .txn-filters-body { display: none; }
+  .txn-filter-card.open .txn-filters-body { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .txn-filter-card.open .txn-filters-body .select { min-width: 0; width: 100%; }
+  .txn-filter-toggle { display: inline-flex; align-items: center; gap: 6px; }
+}
+
+/* Finance empty states bring their own icon badge — drop the inherited orbit
+   background glyph (it bled through the title) and reset the cleared margin. */
+.empty.fin-empty { background-image: none; padding: 30px 24px; }
+.empty.fin-empty .empty-title { margin-top: 10px; }

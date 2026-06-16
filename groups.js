@@ -22,8 +22,9 @@ import {
   deleteDoc, query, where, arrayUnion, serverTimestamp, onSnapshot, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-functions.js';
+import { getStorage, ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js';
 
-let _db = null, _auth = null, _functions = null;
+let _db = null, _auth = null, _functions = null, _storage = null;
 
 function ensure() {
   if (_db) return true;
@@ -32,6 +33,7 @@ function ensure() {
   _auth = getAuth(app);
   _db = getFirestore(app);
   _functions = getFunctions(app, 'asia-south1');
+  _storage = getStorage(app);
   return true;
 }
 function uid() { return _auth && _auth.currentUser ? _auth.currentUser.uid : null; }
@@ -57,6 +59,19 @@ const OrbitGroups = {
       updatedAt: serverTimestamp()
     }, { merge: true });
   },
+  // Founder-only: every signed-in user (the admin roster). Rules permit the
+  // list only for the founder email; everyone else gets permission-denied.
+  async listAllUsers() {
+    if (!ensure() || !uid()) return [];
+    try { const snap = await getDocs(collection(_db, 'users')); return snap.docs.map((d) => d.data()); }
+    catch (e) { console.warn('[OrbitGroups] listAllUsers denied/failed', e); return []; }
+  },
+  // Founder-only: every group in the app (for admin stats).
+  async listAllGroups() {
+    if (!ensure() || !uid()) return [];
+    try { const snap = await getDocs(collection(_db, 'groups')); return snap.docs.map((d) => d.data()); }
+    catch (e) { console.warn('[OrbitGroups] listAllGroups denied/failed', e); return []; }
+  },
   async getProfile(theUid) {
     if (!ensure()) return null;
     const s = await getDoc(doc(_db, 'users', theUid));
@@ -75,7 +90,7 @@ const OrbitGroups = {
       createdBy: me,
       createdAt: serverTimestamp(),
       memberUids: [me],
-      members: { [me]: { name: myProfile.name || 'You', upi: myProfile.upi || '', avatar: 'av-c1' } }
+      members: { [me]: { name: myProfile.name || 'You', upi: myProfile.upi || '', avatar: 'av-c1', photoURL: myProfile.photoURL || '' } }
     });
     // index on the user side for fast listing
     await setDoc(doc(_db, 'users', me), { groupIds: arrayUnion(id) }, { merge: true });
@@ -84,6 +99,13 @@ const OrbitGroups = {
   async renameGroup(groupId, name) {
     if (!ensure()) return;
     await updateDoc(doc(_db, 'groups', groupId), { name });
+  },
+  // Owner-only (enforced by rules): delete the shared group doc so it disappears
+  // for every member. (Subcollection docs are left orphaned but become
+  // unreadable once the parent is gone.)
+  async deleteGroup(groupId) {
+    if (!ensure() || !uid()) return;
+    await deleteDoc(doc(_db, 'groups', groupId));
   },
   async getGroup(groupId) {
     if (!ensure()) return null;
@@ -111,6 +133,27 @@ const OrbitGroups = {
       ...expense, id, groupId, createdBy: uid(), createdAt: serverTimestamp()
     });
     return id;
+  },
+
+  // ---- Receipt images (Firebase Storage: receipts/{groupId}/{expenseId}.jpg) ----
+  // The image lives in Storage; only its short download URL is stored on the
+  // expense doc, so it syncs cross-device cheaply (no base64 bloat). Hard 2.5 MB
+  // cap (also enforced by storage.rules). Returns the public download URL.
+  RECEIPT_MAX_BYTES: 2.5 * 1024 * 1024,
+  async uploadReceipt(groupId, expenseId, dataUrl) {
+    if (!ensure() || !uid()) throw new Error('Not signed in');
+    const s = String(dataUrl || '');
+    const comma = s.indexOf(',');
+    const approxBytes = comma >= 0 ? Math.floor((s.length - comma - 1) * 0.75) : s.length;
+    if (approxBytes > this.RECEIPT_MAX_BYTES) throw new Error('receipt-too-large');
+    const r = storageRef(_storage, `receipts/${groupId}/${expenseId}.jpg`);
+    await uploadString(r, s, 'data_url');
+    return await getDownloadURL(r);
+  },
+  async deleteReceiptFile(groupId, expenseId) {
+    if (!ensure() || !uid()) return;
+    try { await deleteObject(storageRef(_storage, `receipts/${groupId}/${expenseId}.jpg`)); }
+    catch (e) { /* object-not-found is fine */ }
   },
   async deleteExpense(groupId, expenseId) {
     if (!ensure()) return;
@@ -191,6 +234,14 @@ const OrbitGroups = {
     const res = await call({ text, ctx: ctx || {} });
     return res.data;
   },
+  // Receipt vision OCR via the SHARED server-side Gemini key. `image` is
+  // { data: base64, mimeType }. Returns { ok, parsed, raw } | { ok:false, error }.
+  async aiOcr(image) {
+    if (!ensure() || !uid()) throw new Error('Not signed in');
+    const call = httpsCallable(_functions, 'aiOcr');
+    const res = await call({ image: image || {} });
+    return res.data;
+  },
   // Owner-only: if email/phone belongs to an existing Orbit account, add them
   // straight into the group (no invite). Returns { ok, found, uid?, name? }.
   async addExistingUser(groupId, { email, phone }) {
@@ -244,6 +295,22 @@ const OrbitGroups = {
     return onSnapshot(collection(_db, 'groups', groupId, 'expenses'),
       (snap) => cb(snap.docs.map((d) => d.data())),
       (err) => console.warn('[OrbitGroups] expense listener error', err));
+  },
+  // Append a shared audit-log entry (expense added/edited/deleted, settlement)
+  // so EVERY member sees who did what — not just the device that did it.
+  async addActivity(groupId, entry) {
+    if (!ensure() || !uid()) return null;
+    const id = rid('act');
+    await setDoc(doc(_db, 'groups', groupId, 'activity', id),
+      Object.assign({}, entry, { id, actorUid: entry.actorUid || uid(), createdAt: serverTimestamp() }));
+    return id;
+  },
+  // Live shared settlements for a group (mirror of onGroupExpenses).
+  onGroupSettlements(groupId, cb) {
+    if (!ensure()) return () => {};
+    return onSnapshot(collection(_db, 'groups', groupId, 'settlements'),
+      (snap) => cb(snap.docs.map((d) => d.data())),
+      (err) => console.warn('[OrbitGroups] settlement listener error', err));
   },
   onMyGroups(cb) {
     if (!ensure() || !uid()) return () => {};

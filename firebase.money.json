@@ -1,18 +1,10 @@
 {
-  "firestore": {
-    "rules": "firestore.rules"
-  },
-  "storage": {
-    "rules": "storage.rules"
-  },
-  "functions": {
-    "source": "functions",
-    "runtime": "nodejs22"
-  },
   "hosting": {
+    "site": "orbit-money-f35be",
     "public": ".",
     "ignore": [
       "firebase.json",
+      "firebase.money.json",
       ".firebaserc",
       "**/.*",
       "**/node_modules/**",

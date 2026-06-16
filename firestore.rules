@@ -53,7 +53,9 @@ service cloud.firestore {
     // so denying client list/query here breaks nothing.)
     match /users/{profileUid} {
       allow get: if signedIn();
-      allow list: if false;
+      // Only the founder may LIST every signed-in user (the admin roster). A
+      // normal user still can't enumerate everyone — only get() a known uid.
+      allow list: if signedIn() && request.auth.token.email == 'sushanthvarma@gmail.com';
       allow write: if signedIn() && uid() == profileUid;
     }
 
@@ -65,6 +67,9 @@ service cloud.firestore {
       // makes collection queries fail with permission-denied, which is why an
       // invited member's group never showed up.
       allow read: if signedIn() && request.auth.uid in resource.data.memberUids;
+      // The founder may LIST every group for the admin dashboard. Non-members
+      // still can't get() an individual group they don't belong to.
+      allow list: if signedIn() && request.auth.token.email == 'sushanthvarma@gmail.com';
 
       // Create only if you stamp yourself as creator AND include
       // yourself in the initial member list (no creating groups you
@@ -73,15 +78,14 @@ service cloud.firestore {
         && request.resource.data.createdBy == uid()
         && uid() in request.resource.data.memberUids;
 
-      // Existing members may update the group's own fields (rename, currency,
-      // members metadata map, etc.). A member cannot change the creator, and —
-      // critically — cannot add or remove anyone from the access list. The
-      // member roster (memberUids) is mutated ONLY by the trusted Cloud
-      // Functions (acceptInvite / leaveGroup / claimPending), which run with
-      // admin privileges and bypass these rules. This stops any member from
-      // removing other people from a group.
+      // Only the OWNER may change the group's own fields (rename, currency,
+      // category, archived). Members cannot re-configure a shared group. The
+      // creator and the member roster (memberUids) stay immutable here
+      // regardless — the roster is mutated ONLY by the trusted Cloud Functions
+      // (acceptInvite / leaveGroup / removeMember / claimPending), which run
+      // with admin privileges and bypass these rules.
       allow update: if signedIn()
-        && request.auth.uid in resource.data.memberUids
+        && resource.data.createdBy == uid()
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.memberUids == resource.data.memberUids;
 
@@ -96,6 +100,11 @@ service cloud.firestore {
         allow read, write: if isGroupMember(groupId);
       }
       match /activity/{activityId} {
+        allow read, write: if isGroupMember(groupId);
+      }
+      // Receipt images (one doc per expense). Members can read/write so every
+      // member can review the group's receipts in the Receipts tab.
+      match /receipts/{expenseId} {
         allow read, write: if isGroupMember(groupId);
       }
     }
@@ -132,6 +141,15 @@ service cloud.firestore {
         && request.resource.data.invitedBy == uid()
         && isGroupMember(request.resource.data.groupId);
       allow update, delete: if false;
+    }
+
+    // Identity index (verified handle -> uid). Written and read ONLY by the
+    // trusted Cloud Functions (the admin SDK bypasses these rules). No client
+    // access: deny so a signed-in user can't enumerate handle->uid mappings and
+    // harvest the account base. (The default-deny below would cover this too;
+    // it's spelled out for intent.)
+    match /identities/{handle} {
+      allow read, write: if false;
     }
 
     // Founder-only global activity feed (every join across the whole app).

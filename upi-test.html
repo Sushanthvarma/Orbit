@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Orbit · UPI redirect test</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 18px; background: #F6F2E8; color: #1a1814; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p.sub { color: #6b6f7e; font-size: 13px; margin: 0 0 16px; }
+    .row { display: flex; gap: 8px; margin-bottom: 10px; }
+    label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px; }
+    input { width: 100%; padding: 10px 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 10px; box-sizing: border-box; }
+    button { width: 100%; padding: 14px; font-size: 15px; font-weight: 600; border: 0; border-radius: 12px; background: #2A2356; color: #fff; margin-top: 10px; cursor: pointer; }
+    .meth { background: #fff; border: 1px solid #e4ddcd; border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; }
+    .meth h3 { margin: 0 0 4px; font-size: 14px; }
+    .url { font-family: monospace; font-size: 11px; color: #6b6f7e; word-break: break-all; background: #faf7ef; padding: 8px; border-radius: 8px; margin: 6px 0; }
+    .info { background: #fff; border: 1px solid #e4ddcd; border-radius: 14px; padding: 12px 14px; margin-bottom: 16px; font-size: 12px; font-family: monospace; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>UPI redirect test</h1>
+  <p class="sub">Tap each button. Tell me which ones open a UPI app (GPay / PhonePe / Paytm) vs. do nothing / show an error.</p>
+
+  <div class="info" id="device"></div>
+
+  <div class="row">
+    <div style="flex:1"><label>Payee UPI ID</label><input id="vpa" value="test@oksbi" /></div>
+    <div style="width:90px"><label>Amount</label><input id="amt" value="1" inputmode="decimal" /></div>
+  </div>
+
+  <div id="methods"></div>
+
+  <script>
+    var d = document.getElementById('device');
+    d.textContent = 'UA: ' + navigator.userAgent + '\n' +
+      'isAndroid: ' + /Android/i.test(navigator.userAgent) + '\n' +
+      'standalone(PWA): ' + (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) + '\n' +
+      'referrer: ' + (document.referrer || '(none)');
+
+    function q() {
+      var pa = encodeURIComponent(document.getElementById('vpa').value.trim());
+      var am = Number(document.getElementById('amt').value || '1').toFixed(2);
+      return 'pa=' + pa + '&pn=' + encodeURIComponent('Orbit Test') + '&am=' + am + '&cu=INR&tn=' + encodeURIComponent('Orbit test');
+    }
+
+    var methods = [
+      { n: '1 · upi:// via location.href', u: function () { return 'upi://pay?' + q(); }, go: function (u) { window.location.href = u; } },
+      { n: '2 · intent:// via location.href', u: function () { return 'intent://pay?' + q() + '#Intent;scheme=upi;end'; }, go: function (u) { window.location.href = u; } },
+      { n: '3 · upi:// via <a> click', u: function () { return 'upi://pay?' + q(); }, go: function (u) { var a = document.createElement('a'); a.href = u; document.body.appendChild(a); a.click(); document.body.removeChild(a); } },
+      { n: '4 · GPay tez:// via location.href', u: function () { return 'tez://upi/pay?' + q(); }, go: function (u) { window.location.href = u; } },
+      { n: '5 · PhonePe phonepe:// via location.href', u: function () { return 'phonepe://pay?' + q(); }, go: function (u) { window.location.href = u; } }
+    ];
+
+    var root = document.getElementById('methods');
+    methods.forEach(function (m) {
+      var box = document.createElement('div'); box.className = 'meth';
+      var h3 = document.createElement('h3'); h3.textContent = m.n; box.appendChild(h3);
+      var url = document.createElement('div'); url.className = 'url'; box.appendChild(url);
+      var btn = document.createElement('button'); btn.textContent = 'Try method ' + m.n.split(' ')[0];
+      btn.addEventListener('click', function () { var u = m.u(); url.textContent = u; m.go(u); });
+      box.appendChild(btn);
+      root.appendChild(box);
+    });
+  </script>
+</body>
+</html>

@@ -24,8 +24,12 @@ import {
   getDoc, getDocs, setDoc, deleteDoc, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
 
-const STORE_COLLECTIONS = ['users', 'groups', 'expenses', 'settlements', 'meta', 'activity'];
-const KEY_FIELD = { meta: 'key' }; // others default to 'id'
+const STORE_COLLECTIONS = ['users', 'groups', 'expenses', 'settlements', 'meta', 'activity',
+  // Personal-finance suite — synced per-user the same way (rules already allow
+  // any subcollection under orbit/{uid} via the recursive wildcard).
+  'fin_accounts', 'fin_nwhistory', 'fin_txns', 'fin_budgets', 'fin_goals',
+  'fin_loans', 'fin_investments', 'fin_subs', 'fin_recurring'];
+const KEY_FIELD = { meta: 'key', fin_nwhistory: 'date' }; // others default to 'id'
 
 function isConfigured(cfg) {
   if (!cfg) return false;

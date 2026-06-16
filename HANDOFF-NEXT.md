@@ -1,3 +1,12 @@
+> **⚠️ This file covers the ORIGINAL Splitwise multi-user work only.**
+> For the current **Split + Money super-app** (the personal-finance suite, live at
+> `https://orbit-money-f35be.web.app`), start with **[CLAUDE.md](CLAUDE.md)** and
+> **[MONEY.md](MONEY.md)** — architecture, test commands (3,900+ tests), deploy steps,
+> known issues, and the prioritized backlog. The Money work deploys to a **separate
+> Firebase site** and must not touch the GitHub Pages live app below.
+
+---
+
 # Orbit — Handoff / What's Next
 
 Context for continuing the build (any AI model or developer can pick this up cold).

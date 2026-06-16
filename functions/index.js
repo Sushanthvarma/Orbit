@@ -210,6 +210,20 @@ export const claimPending = onCall({ region: REGION }, async (request) => {
   if (token.phone_number) handles.push(String(token.phone_number));
   if (!handles.length) return { ok: true, claimed: [] };
 
+  // Identity index: record each VERIFIED handle -> this uid so the owner-side
+  // "add by email/phone" (addExistingUser) can later resolve this account by
+  // ANY handle it has proven to own — not just the single email/phone stored on
+  // its profile. Idempotent (merge) and runs on every sign-in, so the index
+  // self-heals. A handle the person never verifies (e.g. a stray Yahoo address
+  // saved in someone's phone) is deliberately NOT indexed — we never assert an
+  // unproven handle is them; the owner-side merge tool handles that case.
+  for (const handle of handles) {
+    await db.doc(`identities/${handle}`).set(
+      { uid, handle, verified: true, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+  }
+
   const profileSnap = await db.doc(`users/${uid}`).get();
   const profile = profileSnap.exists ? profileSnap.data() : {};
   const claimed = [];
@@ -306,20 +320,32 @@ export const addExistingUser = onCall({ region: REGION }, async (request) => {
     throw new HttpsError('permission-denied', 'Only the group owner can add members.');
   }
 
-  // Find an existing account by verified handle.
-  let userDoc = null;
-  if (email) {
-    const q = await db.collection('users').where('email', '==', email).limit(1).get();
-    if (!q.empty) userDoc = q.docs[0];
+  // Resolve the target account. Prefer the identity index (maps ANY verified
+  // handle -> uid, so a person added under a SECONDARY proven email/phone still
+  // resolves), then fall back to the legacy profile email/phone lookup for
+  // accounts that signed in before the index existed.
+  let targetUid = null, targetProfile = null;
+  for (const handle of [email, phone].filter(Boolean)) {
+    const idSnap = await db.doc(`identities/${handle}`).get();
+    if (idSnap.exists && idSnap.data() && idSnap.data().uid) { targetUid = idSnap.data().uid; break; }
   }
-  if (!userDoc && phone) {
-    const q = await db.collection('users').where('phone', '==', phone).limit(1).get();
-    if (!q.empty) userDoc = q.docs[0];
+  if (!targetUid) {
+    let userDoc = null;
+    if (email) {
+      const q = await db.collection('users').where('email', '==', email).limit(1).get();
+      if (!q.empty) userDoc = q.docs[0];
+    }
+    if (!userDoc && phone) {
+      const q = await db.collection('users').where('phone', '==', phone).limit(1).get();
+      if (!q.empty) userDoc = q.docs[0];
+    }
+    if (userDoc) { targetUid = userDoc.id; targetProfile = userDoc.data() || {}; }
   }
-  if (!userDoc) return { ok: true, found: false };
-
-  const targetUid = userDoc.id;
-  const targetProfile = userDoc.data() || {};
+  if (!targetUid) return { ok: true, found: false };
+  if (!targetProfile) {
+    const p = await db.doc(`users/${targetUid}`).get();
+    targetProfile = p.exists ? p.data() : {};
+  }
   const targetName = targetProfile.name || 'Member';
 
   await db.runTransaction(async (tx) => {
@@ -357,9 +383,91 @@ export const addExistingUser = onCall({ region: REGION }, async (request) => {
    prompt is built server-side (clients send only text + lightweight
    context) so the key can't be repurposed for arbitrary prompts.
    ============================================================ */
+// gemini-flash-latest: stable ALIAS tracking the current fast multimodal model,
+// so we don't 404 when a specific version retires (2.0-flash was retired by
+// June 2026). Keep in sync with ai.js MODEL.
+const GEMINI_MODEL = 'gemini-flash-latest';
 const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const AI_DAILY_CAP = 50; // per user per UTC day
+  'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
+const AI_DAILY_CAP = 50; // per user per UTC day (shared across text + receipt OCR)
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Gemini 429 (rate limit / quota burst) and 503 (overloaded) are usually
+// transient; a short backoff clears the per-minute window most of the time.
+const GEMINI_RETRYABLE = new Set([429, 500, 503]);
+// `parts` is the contents[0].parts array — text and/or { inlineData } image.
+async function callGemini(key, parts) {
+  const init = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0 }
+    })
+  };
+  let res;
+  for (let attempt = 0; ; attempt++) {
+    res = await fetch(GEMINI_ENDPOINT, init);
+    if (res.ok || !GEMINI_RETRYABLE.has(res.status) || attempt >= 2) return res;
+    await sleep(800 * Math.pow(2, attempt)); // 0.8s → 1.6s
+  }
+}
+
+// Soft per-user daily cap (UTC day) shared across text parse + receipt OCR.
+// Enforced read-only up front; charged only AFTER a successful Gemini call so
+// an upstream 429 / parse failure never burns the user's quota.
+async function enforceDailyCap(uid) {
+  const today = new Date().toISOString().slice(0, 10);
+  const usageRef = db.doc(`aiUsage/${uid}`);
+  const snap = await usageRef.get();
+  const d = snap.exists ? snap.data() : {};
+  const usedToday = d.day === today ? (d.count || 0) : 0;
+  if (usedToday >= AI_DAILY_CAP) throw new HttpsError('resource-exhausted', 'Daily AI limit reached. Try again tomorrow.');
+  return { usageRef, today };
+}
+async function chargeDailyCap(usageRef, today) {
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(usageRef);
+    const d = snap.exists ? snap.data() : {};
+    const count = d.day === today ? (d.count || 0) : 0;
+    tx.set(usageRef, { day: today, count: count + 1, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  });
+}
+
+// Extract + JSON.parse the model's text part. Returns parsed | null.
+function parseGeminiJson(body) {
+  const partText = (body && body.candidates && body.candidates[0] &&
+    body.candidates[0].content && body.candidates[0].content.parts &&
+    body.candidates[0].content.parts[0] && body.candidates[0].content.parts[0].text) || '';
+  try {
+    return { ok: true, parsed: JSON.parse(partText.trim().replace(/^```json\s*|\s*```$/g, '')), raw: partText };
+  } catch (_) {
+    return { ok: false, raw: partText };
+  }
+}
+
+const RECEIPT_PROMPT = [
+  'You are a receipt OCR and parser. Read the receipt in the image and output strict JSON only.',
+  '',
+  'JSON schema:',
+  '{',
+  '  "merchant": string|null,',
+  '  "title": string,',
+  '  "total": number,',
+  '  "currency": "INR"|"USD"|"EUR"|"GBP",',
+  '  "date": string|null,',
+  '  "category": one of: food, travel, bills, shop, fun, rent, transport, other,',
+  '  "lineItems": [{ "label": string, "amount": number }]',
+  '}',
+  '',
+  'Rules:',
+  '- "total" is the FINAL amount paid (grand total / amount due), not the subtotal.',
+  '- Amounts are plain numbers — no currency symbols, no thousands separators.',
+  '- Infer currency from symbols: rupee or Rs = INR, $ = USD, euro = EUR, pound = GBP. Default INR.',
+  '- "lineItems" are individual purchased items, excluding total/tax lines.',
+  '- If the receipt is unreadable, set total 0 and lineItems [].',
+  '- Output JSON only. No code fences, no commentary.'
+].join('\n');
 
 function buildExpensePrompt(text, ctx) {
   ctx = ctx || {};
@@ -413,28 +521,12 @@ export const aiParse = onCall({ region: REGION }, async (request) => {
   const key = process.env.GEMINI_API_KEY || '';
   if (!key) return { ok: false, error: 'no-server-key' }; // lets the client fall back to a local key
 
-  // Soft per-user daily cap (UTC day) to protect the shared key.
-  const today = new Date().toISOString().slice(0, 10);
-  const usageRef = db.doc(`aiUsage/${uid}`);
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(usageRef);
-    const d = snap.exists ? snap.data() : {};
-    const count = d.day === today ? (d.count || 0) : 0;
-    if (count >= AI_DAILY_CAP) throw new HttpsError('resource-exhausted', 'Daily AI limit reached. Try again tomorrow.');
-    tx.set(usageRef, { day: today, count: count + 1, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-  });
+  const { usageRef, today } = await enforceDailyCap(uid);
 
   const prompt = buildExpensePrompt(text, request.data && request.data.ctx);
   let body;
   try {
-    const res = await fetch(GEMINI_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0 }
-      })
-    });
+    const res = await callGemini(key, [{ text: prompt }]);
     if (!res.ok) {
       const txt = (await res.text().catch(() => '')).split(key).join('***');
       return { ok: false, error: 'http-' + res.status, raw: txt };
@@ -444,14 +536,50 @@ export const aiParse = onCall({ region: REGION }, async (request) => {
     return { ok: false, error: 'network', raw: String(e) };
   }
 
-  const partText = (body && body.candidates && body.candidates[0] &&
-    body.candidates[0].content && body.candidates[0].content.parts &&
-    body.candidates[0].content.parts[0] && body.candidates[0].content.parts[0].text) || '';
-  let parsed;
+  const out = parseGeminiJson(body);
+  if (!out.ok) return { ok: false, error: 'parse', raw: out.raw };
+
+  await chargeDailyCap(usageRef, today);
+  return { ok: true, parsed: out.parsed, raw: out.raw };
+});
+
+/* ------------------------------------------------------------------
+   aiOcr({ image: { data: base64, mimeType } }) — callable.
+   Reads a receipt image with Gemini vision and returns structured JSON.
+   Shares the per-user daily cap and shared key with aiParse.
+   ------------------------------------------------------------------ */
+export const aiOcr = onCall({ region: REGION }, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in to scan receipts.');
+  const image = request.data && request.data.image;
+  if (!image || !image.data) throw new HttpsError('invalid-argument', 'No image to read.');
+  // Guard the payload: a downscaled receipt is ~100–250 KB base64; reject huge
+  // blobs so a bad client can't hand the shared key a 10 MB image.
+  if (String(image.data).length > 6 * 1024 * 1024) throw new HttpsError('invalid-argument', 'Image too large.');
+
+  const key = process.env.GEMINI_API_KEY || '';
+  if (!key) return { ok: false, error: 'no-server-key' };
+
+  const { usageRef, today } = await enforceDailyCap(uid);
+
+  let body;
   try {
-    parsed = JSON.parse(partText.trim().replace(/^```json\s*|\s*```$/g, ''));
-  } catch (_) {
-    return { ok: false, error: 'parse', raw: partText };
+    const res = await callGemini(key, [
+      { text: RECEIPT_PROMPT },
+      { inlineData: { mimeType: image.mimeType || 'image/jpeg', data: image.data } }
+    ]);
+    if (!res.ok) {
+      const txt = (await res.text().catch(() => '')).split(key).join('***');
+      return { ok: false, error: 'http-' + res.status, raw: txt };
+    }
+    body = await res.json();
+  } catch (e) {
+    return { ok: false, error: 'network', raw: String(e) };
   }
-  return { ok: true, parsed, raw: partText };
+
+  const out = parseGeminiJson(body);
+  if (!out.ok) return { ok: false, error: 'parse', raw: out.raw };
+
+  await chargeDailyCap(usageRef, today);
+  return { ok: true, parsed: out.parsed, raw: out.raw };
 });

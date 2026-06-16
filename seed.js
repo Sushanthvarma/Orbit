@@ -214,6 +214,8 @@
     await OrbitDB.putAll('expenses', ORBIT_SEED.expenses);
     await OrbitDB.putAll('settlements', ORBIT_SEED.settlements);
     await OrbitDB.setMeta('selfUserId', 'u_self');
+    // Also seed the personal-finance suite so the Money section is populated.
+    if (typeof global.loadFinanceDemo === 'function') { try { await global.loadFinanceDemo(); } catch (_) {} }
     return true;
   };
 })(window);

@@ -7,8 +7,13 @@
   'use strict';
 
   const DB_NAME = 'orbit-web';
-  const DB_VERSION = 2;
-  const STORES = ['users', 'groups', 'expenses', 'settlements', 'meta', 'activity'];
+  const DB_VERSION = 4;
+  // `fin_*` stores hold the personal-finance suite (net worth, budgets, goals,
+  // loans, …), kept separate from the expense-splitting stores so the two
+  // domains never collide. Accounts/history added in v3; the rest in v4.
+  const FIN_STORES = ['fin_accounts', 'fin_nwhistory', 'fin_txns', 'fin_budgets',
+    'fin_goals', 'fin_loans', 'fin_investments', 'fin_subs', 'fin_recurring'];
+  const STORES = ['users', 'groups', 'expenses', 'settlements', 'meta', 'activity'].concat(FIN_STORES);
 
   let _db = null;
 
@@ -46,6 +51,23 @@
           s.createIndex('entityId', 'entityId', { unique: false });
           s.createIndex('groupId', 'groupId', { unique: false });
         }
+        // Personal-finance suite (v3+)
+        if (!db.objectStoreNames.contains('fin_accounts')) {
+          db.createObjectStore('fin_accounts', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('fin_nwhistory')) {
+          // keyed by ISO date so we keep at most one snapshot per day
+          db.createObjectStore('fin_nwhistory', { keyPath: 'date' });
+        }
+        // v4: the rest of the finance suite. id-keyed; txns indexed by date.
+        if (!db.objectStoreNames.contains('fin_txns')) {
+          const s = db.createObjectStore('fin_txns', { keyPath: 'id' });
+          s.createIndex('date', 'date', { unique: false });
+          s.createIndex('category', 'category', { unique: false });
+        }
+        ['fin_budgets', 'fin_goals', 'fin_loans', 'fin_investments', 'fin_subs', 'fin_recurring'].forEach((name) => {
+          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
+        });
       };
 
       req.onsuccess = () => {
